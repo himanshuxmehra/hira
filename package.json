@@ -30,6 +30,14 @@
   ],
   "author": "Himanshu <himanshu24mehra@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/himanshuxmehra/hira.git"
+  },
+  "homepage": "https://github.com/himanshuxmehra/hira#readme",
+  "bugs": {
+    "url": "https://github.com/himanshuxmehra/hira/issues"
+  },
   "engines": {
     "node": ">=20"
   },
