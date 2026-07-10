@@ -1,0 +1,30 @@
+{
+  "name": "hira",
+  "version": "0.1.0",
+  "description": "Local Jira + wiki that lives inside your project. Markdown tickets, a static board, and an AI-agent friendly CLI.",
+  "type": "module",
+  "bin": {
+    "hira": "./bin/hira.js"
+  },
+  "main": "./src/core/index.js",
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "kanban",
+    "tasks",
+    "tickets",
+    "markdown",
+    "cli",
+    "project-management"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.3",
+    "yaml": "^2.9.0"
+  }
+}

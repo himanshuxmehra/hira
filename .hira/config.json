@@ -1,0 +1,17 @@
+{
+  "name": "hira",
+  "prefix": "HIRA",
+  "nextId": 7,
+  "statuses": [
+    "todo",
+    "in-progress",
+    "done",
+    "blocked"
+  ],
+  "priorities": [
+    "low",
+    "medium",
+    "high",
+    "urgent"
+  ]
+}
