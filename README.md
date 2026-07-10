@@ -7,8 +7,10 @@ No server, no account, no database. Everything is files, so it versions with you
 ## Install
 
 ```sh
-npm install -g hira   # or: npm link from this repo
+npm install -g hira-board   # or: npm link from this repo
 ```
+
+The package is `hira-board`; the command it installs is `hira`.
 
 ## Quick start
 
@@ -87,7 +89,7 @@ Looked at SortableJS — tiny, no deps.
 The core is importable if you want to build on it:
 
 ```js
-import { Store, findRoot, initStore } from 'hira';
+import { Store, findRoot, initStore } from 'hira-board';
 
 const store = new Store(findRoot());
 store.create({ title: 'From code', priority: 'high' });

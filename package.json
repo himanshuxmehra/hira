@@ -1,5 +1,5 @@
 {
-  "name": "hira",
+  "name": "hira-board",
   "version": "0.1.0",
   "description": "Local Jira + wiki that lives inside your project. Markdown tickets, a static board, and an AI-agent friendly CLI.",
   "type": "module",
@@ -9,10 +9,13 @@
   "main": "./src/core/index.js",
   "files": [
     "bin",
-    "src"
+    "src",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "kanban",
@@ -20,9 +23,16 @@
     "tickets",
     "markdown",
     "cli",
-    "project-management"
+    "project-management",
+    "jira",
+    "board",
+    "ai-agents"
   ],
+  "author": "Himanshu <mehrah2000@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "commander": "^14.0.3",
     "yaml": "^2.9.0"
