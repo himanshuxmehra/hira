@@ -55,10 +55,10 @@ program
 
 program
   .command('init')
-  .description('initialize hira in the current directory (.hira/, board.html, CLAUDE.md agent snippet)')
+  .description('initialize hira in the current directory (.hira/, board.html, agent snippet in AGENTS.md + CLAUDE.md)')
   .option('--prefix <prefix>', 'ticket ID prefix (default: derived from directory name)')
   .option('--name <name>', 'project name (default: directory name)')
-  .option('--no-agent-doc', 'skip adding the agent instructions to CLAUDE.md')
+  .option('--no-agent-doc', 'skip adding the agent instructions to AGENTS.md and CLAUDE.md')
   .action((opts) => {
     let store;
     try {
@@ -71,14 +71,16 @@ program
     console.log(dim(`  tickets:  ${path.relative(process.cwd(), store.ticketsDir)}/`));
     console.log(dim(`  board:    ${path.relative(process.cwd(), boardPath)}`));
     if (opts.agentDoc) {
-      const claudeMd = path.join(process.cwd(), 'CLAUDE.md');
       const snippet = fs.readFileSync(path.join(pkgDir, 'src', 'templates', 'agent-snippet.md'), 'utf8');
-      const existing = fs.existsSync(claudeMd) ? fs.readFileSync(claudeMd, 'utf8') : '';
-      if (existing.includes('## Task tracking (hira)')) {
-        console.log(dim('  CLAUDE.md already has the hira section, skipped'));
-      } else {
-        fs.writeFileSync(claudeMd, existing + (existing && !existing.endsWith('\n\n') ? '\n\n' : '') + snippet);
-        console.log(green('✓') + ' added agent instructions to CLAUDE.md');
+      for (const name of ['AGENTS.md', 'CLAUDE.md']) {
+        const file = path.join(process.cwd(), name);
+        const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+        if (existing.includes('## Task tracking (hira)')) {
+          console.log(dim(`  ${name} already has the hira section, skipped`));
+        } else {
+          fs.writeFileSync(file, existing + (existing && !existing.endsWith('\n\n') ? '\n\n' : '') + snippet);
+          console.log(green('✓') + ` added agent instructions to ${name}`);
+        }
       }
     }
     console.log(`\nCreate your first ticket:  ${cyan('hira add "My first task" -p high')}`);

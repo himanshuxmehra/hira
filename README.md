@@ -16,7 +16,7 @@ The package is `hira-board`; the command it installs is `hira`.
 
 ```sh
 cd your-project
-hira init                      # creates .hira/, board.html, agent snippet in CLAUDE.md
+hira init                      # creates .hira/, board.html, agent snippet in AGENTS.md + CLAUDE.md
 hira add "Fix login bug" -p urgent --due 2026-07-20 -t auth,bug
 hira add "Write docs" -d "Cover setup + API.
 
@@ -82,7 +82,7 @@ Looked at SortableJS — tiny, no deps.
 
 ## AI agents
 
-`hira init` appends a section to your project's `CLAUDE.md` teaching agents the workflow: check `hira list --json` at session start, move tickets to `in-progress` when picking them up, log progress with `hira comment`, and file discovered work with `hira add`. Any agent that can run shell commands can use hira; `--json` flags make output machine-parseable.
+`hira init` appends a section to your project's `AGENTS.md` (the cross-tool standard read by Codex, Cursor, Copilot, Gemini CLI, Antigravity, Zed, and others) and `CLAUDE.md` (Claude Code) teaching agents the workflow: check `hira list --json` at session start, move tickets to `in-progress` when picking them up, log progress with `hira comment`, and file discovered work with `hira add`. Any agent that can run shell commands can use hira; `--json` flags make output machine-parseable.
 
 ## Library use
 
