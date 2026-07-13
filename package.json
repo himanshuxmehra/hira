@@ -1,6 +1,6 @@
 {
   "name": "hira-board",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local Jira + wiki that lives inside your project. Markdown tickets, a static board, and an AI-agent friendly CLI.",
   "type": "module",
   "bin": {
