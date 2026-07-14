@@ -50,7 +50,7 @@ function parseTags(value) {
 const program = new Command();
 program
   .name('hira')
-  .description('Local Jira + wiki that lives inside your project. Tickets are markdown files in .hira/tickets/.')
+  .description('Git-native task tracking for you and your AI agents. Tickets are markdown files in .hira/tickets/.')
   .version(pkg.version);
 
 program

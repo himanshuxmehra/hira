@@ -1,8 +1,8 @@
 # hira
 
-A local Jira + wiki that lives **inside your project**. Tickets are plain markdown files in `.hira/tickets/`, managed by a CLI, viewed on a static kanban board + dashboard, and fully usable by AI agents.
+Git-native task tracking for you and your AI agents. Tickets are plain markdown files in `.hira/tickets/`, managed by a CLI your agents can drive, viewed on a static kanban board + dashboard.
 
-No server, no account, no database. Everything is files, so it versions with your repo.
+No server, no account, no database. Everything is files, so it versions with your repo — think of it as a local Jira your coding agents can actually use.
 
 ## Install
 

@@ -1,7 +1,7 @@
 {
   "name": "hira-board",
-  "version": "0.1.1",
-  "description": "Local Jira + wiki that lives inside your project. Markdown tickets, a static board, and an AI-agent friendly CLI.",
+  "version": "0.1.2",
+  "description": "Git-native task tracker and kanban board built for AI coding agents. Markdown tickets, a static board, zero infrastructure.",
   "type": "module",
   "bin": {
     "hira": "./bin/hira.js"
@@ -26,7 +26,11 @@
     "project-management",
     "jira",
     "board",
-    "ai-agents"
+    "ai-agents",
+    "agents",
+    "claude-code",
+    "agent-workflow",
+    "task-tracking"
   ],
   "author": "Himanshu <himanshu24mehra@gmail.com>",
   "license": "MIT",
