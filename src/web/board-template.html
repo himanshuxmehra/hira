@@ -196,7 +196,7 @@
 
   /* ---------- Dashboard ---------- */
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .tile { text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 14px 16px; }
+  .tile { display: flex; flex-direction: column; justify-content: flex-start; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 14px 16px; }
   .tile:hover { border-color: var(--baseline); }
   .tile .tlabel { color: var(--text-secondary); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
   .tile .tvalue { font-weight: 600; font-size: 30px; margin-top: 2px; letter-spacing: -0.01em; }
@@ -205,6 +205,12 @@
 
   .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
   .panel { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 16px; }
+  .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--gridline); }
+  .kv:last-child { border-bottom: 0; }
+  .kv .k { color: var(--text-secondary); }
+  .kv .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .kv .v small { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
+  .kv[role="button"] { cursor: pointer; }
   .panel.wide { grid-column: 1 / -1; }
   .clist li { flex-direction: column; gap: 2px; }
   .clist .chead { display: flex; align-items: baseline; gap: 8px; width: 100%; }
@@ -321,6 +327,10 @@
       <div class="panel">
         <h2>Recently updated</h2>
         <ul class="plist" id="recent-list"></ul>
+      </div>
+      <div class="panel">
+        <h2>Flow</h2>
+        <div id="flow-stats"></div>
       </div>
       <div class="panel wide">
         <h2>Recent comments</h2>
@@ -749,6 +759,7 @@ function renderDash() {
     <div class="tvalue">${t.value}</div>${t.sub ? `<div class="tsub">${t.sub}</div>` : ''}</button>`).join('');
 
   renderPrioChart(open);
+  renderFlow();
   renderRecentComments();
 
   const dueSoon = tickets
@@ -770,6 +781,32 @@ function renderDash() {
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
         <span class="pwhen">${whenHtml(t.updated)}</span></li>`).join('')
     : '<li class="none">No activity yet.</li>';
+}
+
+function fmtDuration(ms) {
+  const mins = ms / 60000, hrs = mins / 60, days = hrs / 24;
+  if (mins < 60) return Math.max(1, Math.round(mins)) + ' min';
+  if (hrs < 48) return Math.round(hrs) + ' hours';
+  if (days < 60) return Math.round(days * 10) / 10 + ' days';
+  return Math.round(days / 30) + ' months';
+}
+/** Cycle time = created → last update of a done ticket (updated is the best "finished" signal the files carry). */
+function renderFlow() {
+  const WEEK = 7 * 86400000, now = Date.now();
+  const at = (v) => { const d = parseWhen(v); return d ? d.getTime() : null; };
+  const done = tickets.filter((t) => t.status === 'done' && at(t.created) && at(t.updated));
+  const avg = done.length ? done.reduce((sum, t) => sum + (at(t.updated) - at(t.created)), 0) / done.length : null;
+  const open = tickets.filter((t) => t.status !== 'done' && at(t.created));
+  const oldest = open.sort((a, b) => at(a.created) - at(b.created))[0];
+  const createdWeek = tickets.filter((t) => at(t.created) > now - WEEK).length;
+  const doneWeek = tickets.filter((t) => t.status === 'done' && at(t.updated) > now - WEEK).length;
+  document.getElementById('flow-stats').innerHTML = `
+    <div class="kv"><span class="k">Avg time to done</span>
+      <span class="v">${avg === null ? '—' : fmtDuration(avg)}${done.length ? `<small>across ${done.length} done</small>` : ''}</span></div>
+    <div class="kv"${oldest ? ` role="button" tabindex="0" onclick="openModal('${esc(oldest.id)}')"` : ''}><span class="k">Oldest open ticket</span>
+      <span class="v">${oldest ? `${esc(oldest.id)} · ${fmtDuration(now - at(oldest.created))}<small>${esc(oldest.title)}</small>` : '—'}</span></div>
+    <div class="kv"><span class="k">Created, last 7 days</span><span class="v">${createdWeek}</span></div>
+    <div class="kv"><span class="k">Done, last 7 days</span><span class="v">${doneWeek}</span></div>`;
 }
 
 function renderRecentComments() {
