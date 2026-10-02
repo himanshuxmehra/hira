@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { Store, findRoot, initStore } from '../src/core/store.js';
+import { localDate } from '../src/core/ticket.js';
 import { generateBoard } from '../src/core/board.js';
 
 const pkgDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +37,7 @@ function printTicketLine(t, { statuses, priorities }) {
   const paintP = PRIO_PAINT[t.priority] || ((x) => x);
   let line = `${bold(t.id.padEnd(10))} ${paintS(t.status.padEnd(statusW))}  ${paintP(t.priority.padEnd(prioW))}  ${t.title}`;
   if (t.due) {
-    const overdue = t.due < new Date().toISOString().slice(0, 10) && t.status !== 'done';
+    const overdue = t.due < localDate() && t.status !== 'done';
     line += '  ' + (overdue ? red(`due ${t.due} (overdue)`) : dim(`due ${t.due}`));
   }
   if (t.tags.length) line += '  ' + magenta(t.tags.map((x) => '#' + x).join(' '));

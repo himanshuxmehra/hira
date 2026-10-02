@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseTicket, serializeTicket } from '../src/core/ticket.js';
+import { parseTicket, serializeTicket, localDate } from '../src/core/ticket.js';
 import { initStore, findRoot, Store } from '../src/core/store.js';
 
 test('ticket roundtrip: serialize then parse preserves everything', () => {
@@ -79,4 +79,9 @@ test('store CRUD lifecycle', () => {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('localDate uses the local calendar day, not UTC', () => {
+  assert.equal(localDate(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
+  assert.equal(localDate(new Date(2026, 11, 31, 0, 1)), '2026-12-31');
 });

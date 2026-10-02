@@ -233,7 +233,10 @@ const PRIO_BAR = {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const todayStr = new Date().toISOString().slice(0, 10);
+const todayStr = (() => {
+  const d = new Date(), pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+})();
 const isOverdue = (t) => t.due && t.due < todayStr && t.status !== 'done';
 const statusLabel = (s) => STATUS_LABEL[s] || s;
 
