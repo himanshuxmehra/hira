@@ -355,11 +355,21 @@ function md(text) {
   flushAll();
   return html.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
   function inline(s) {
-    return esc(s)
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Finished HTML is parked behind placeholders so later passes can't re-process it (e.g. a URL inside `code`).
+    const stash = [];
+    const hold = (h) => '\u0001' + (stash.push(h) - 1) + '\u0001';
+    const out = esc(s)
+      .replace(/`([^`]+)`/g, (_, c) => hold(`<code>${c}</code>`))
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_, t, u) => hold(`<a href="${u}" target="_blank" rel="noopener">${t}</a>`))
+      .replace(/https?:\/\/(?:(?!&quot;|&#39;|&lt;|&gt;)\S)+/g, (u) => {
+        let trail = (/[.,;:!?]+$/.exec(u) || [''])[0];
+        let url = u.slice(0, u.length - trail.length);
+        if ((url.match(/\)/g) || []).length > (url.match(/\(/g) || []).length) { url = url.slice(0, -1); trail = ')' + trail; }
+        return hold(`<a href="${url}" target="_blank" rel="noopener">${url}</a>`) + trail;
+      })
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    return out.replace(/\u0001(\d+)\u0001/g, (_, i) => stash[+i]);
   }
 }
 
