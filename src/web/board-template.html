@@ -163,7 +163,13 @@
     padding: 10px 12px; cursor: pointer; transition: border-color 0.1s, transform 0.06s;
   }
   .card:hover { border-color: var(--baseline); transform: translateY(-1px); }
+  .card { border-left: 3px solid var(--prio, var(--baseline)); }
+  .card .chead { display: flex; align-items: center; gap: 8px; }
   .card .cid { color: var(--text-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .card .cicons { margin-left: auto; display: inline-flex; gap: 8px; color: var(--text-muted); font-size: 11.5px; }
+  .card .cicons span { display: inline-flex; align-items: center; gap: 3px; }
+  .card .cicons svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .card .ctitle { font-weight: 550; margin: 2px 0 6px; }
   .card .cmeta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-secondary); border: 1px solid var(--gridline); border-radius: 999px; padding: 1px 8px; background: var(--surface-1); }
@@ -397,6 +403,32 @@ function md(text) {
   }
 }
 
+const daysUntil = (due) => Math.round((new Date(due + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
+/** 'due today' / 'due in 3d' / '2d overdue'; far-off dates fall back to the calendar date. */
+function dueLabel(t) {
+  const d = daysUntil(t.due);
+  if (t.status === 'done') return `due ${fmtDate(t.due)}`;
+  if (d < 0) return `${-d}d overdue`;
+  if (d === 0) return 'due today';
+  if (d === 1) return 'due tomorrow';
+  return d <= 14 ? `due in ${d}d` : `due ${fmtDate(t.due)}`;
+}
+const ICON_COMMENT = '<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>';
+const ICON_DESC = '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>';
+
+function cardMetaHtml(t) {
+  let out = `<span class="sr-only">Priority: ${esc(t.priority)}</span>`;
+  if (t.due) out += `<span class="due${isOverdue(t) ? ' overdue' : ''}" title="${esc(t.due)}">${esc(dueLabel(t))}</span>`;
+  for (const tag of t.tags || []) out += `<span class="chip tag">#${esc(tag)}</span>`;
+  return out;
+}
+function cardIconsHtml(t) {
+  let out = '';
+  if (t.description) out += `<span title="Has a description">${ICON_DESC}</span>`;
+  if (t.comments.length) out += `<span title="${t.comments.length} comment${t.comments.length === 1 ? '' : 's'}">${ICON_COMMENT}${t.comments.length}</span>`;
+  return out ? `<span class="cicons">${out}</span>` : '';
+}
+
 function chipHtml(ticket) {
   let out = `<span class="chip"><span class="dot" style="background:${PRIO_COLOR[ticket.priority] || 'var(--chip-low)'}"></span>${esc(ticket.priority)}</span>`;
   if (ticket.due) out += `<span class="due${isOverdue(ticket) ? ' overdue' : ''}">due ${fmtDate(ticket.due)}</span>`;
@@ -554,10 +586,10 @@ function renderBoard() {
         title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
     if (items.length === 0) html += '<div class="empty-col">—</div>';
     for (const t of items) {
-      html += `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" onclick="openModal('${esc(t.id)}')">
-        <div class="cid">${esc(t.id)}</div>
+      html += `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" style="--prio:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}" onclick="openModal('${esc(t.id)}')">
+        <div class="chead"><span class="cid">${esc(t.id)}</span>${cardIconsHtml(t)}</div>
         <div class="ctitle">${esc(t.title)}</div>
-        <div class="cmeta">${chipHtml(t)}</div></div>`;
+        <div class="cmeta">${cardMetaHtml(t)}</div></div>`;
     }
     if (limit && all.length > limit) {
       html += `<button class="show-more" data-status="${esc(status)}">${collapsed ? `Show ${all.length - limit} more` : 'Show fewer'}</button>`;
