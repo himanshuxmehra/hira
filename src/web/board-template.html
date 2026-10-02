@@ -380,7 +380,7 @@ const SORTS = {
   newest: { label: 'Newest first', cmp: (a, b) => (b.created || '').localeCompare(a.created || '') || ticketNo(b) - ticketNo(a) },
   id: { label: 'Ticket ID', cmp: (a, b) => ticketNo(a) - ticketNo(b) },
 };
-const DEFAULT_SORT = 'id';
+const DEFAULT_SORT = 'priority';
 const sortPrefs = (() => {
   const p = loadPref('sort', {});
   const cols = {};
