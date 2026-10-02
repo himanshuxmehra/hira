@@ -196,7 +196,8 @@
 
   /* ---------- Dashboard ---------- */
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .tile { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 14px 16px; }
+  .tile { text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 14px 16px; }
+  .tile:hover { border-color: var(--baseline); }
   .tile .tlabel { color: var(--text-secondary); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
   .tile .tvalue { font-weight: 600; font-size: 30px; margin-top: 2px; letter-spacing: -0.01em; }
   .tile .tsub { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
@@ -344,7 +345,7 @@ const STATUS_COLOR = {
   'done': 'var(--status-done)',
   'blocked': 'var(--status-blocked)',
 };
-const STATUS_LABEL = { 'todo': 'To do', 'in-progress': 'In progress', 'done': 'Done', 'blocked': 'Blocked' };
+const STATUS_LABEL = { 'todo': 'To do', 'in-progress': 'In progress', 'done': 'Done', 'blocked': 'Blocked', 'open': 'Open', 'overdue': 'Overdue' };
 const PRIO_COLOR = {
   'urgent': 'var(--chip-urgent)', 'high': 'var(--chip-high)',
   'medium': 'var(--chip-medium)', 'low': 'var(--chip-low)',
@@ -574,9 +575,10 @@ const SORT_ICON = '<svg viewBox="0 0 24 24"><path d="M8 4v16M4 8l4-4 4 4M16 20V4
 const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 
 /* ---------- Filtering (search / priority / tag; state lives in the URL hash) ---------- */
-const hasFilters = () => !!(route.q || route.p || route.tag);
+const hasFilters = () => !!(route.q || route.p || route.tag || route.s);
 function ticketMatches(t) {
   if (route.p && t.priority !== route.p) return false;
+  if (route.s === 'open' ? t.status === 'done' : route.s === 'overdue' ? !isOverdue(t) : route.s && t.status !== route.s) return false;
   if (route.tag && !(t.tags || []).includes(route.tag)) return false;
   if (route.q) {
     const hay = [t.id, t.title, t.description, ...(t.tags || [])].join(' ').toLowerCase();
@@ -603,12 +605,20 @@ function renderToolbar() {
   if (document.activeElement !== input) input.value = route.q;
   const caret = ' <span class="caret">▾</span>';
   document.getElementById('tb-filters').innerHTML =
-    `<button class="btn${route.p ? ' active' : ''}" id="prio-filter-btn" aria-haspopup="menu">${route.p ? 'Priority: ' + esc(route.p) : 'Priority'}${caret}</button>
+    `<button class="btn${route.s ? ' active' : ''}" id="status-filter-btn" aria-haspopup="menu">${route.s ? 'Status: ' + esc(statusLabel(route.s)) : 'Status'}${caret}</button>
+     <button class="btn${route.p ? ' active' : ''}" id="prio-filter-btn" aria-haspopup="menu">${route.p ? 'Priority: ' + esc(route.p) : 'Priority'}${caret}</button>
      <button class="btn${route.tag ? ' active' : ''}" id="tag-filter-btn" aria-haspopup="menu">${route.tag ? 'Tag: #' + esc(route.tag) : 'Tag'}${caret}</button>
      ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
   document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
   document.getElementById('tb-sort').innerHTML =
     `<button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
+}
+function statusFilterMenu(anchor) {
+  openMenu(anchor, [
+    { label: 'Any status', checked: !route.s, onPick: () => nav({ s: '' }, { replace: true }) },
+    { sep: true },
+    ...STATUS_FILTERS().map((s) => ({ label: statusLabel(s), checked: route.s === s, onPick: () => nav({ s }, { replace: true }) })),
+  ]);
 }
 function priorityFilterMenu(anchor) {
   openMenu(anchor, [
@@ -647,11 +657,13 @@ function columnSortMenu(anchor, status) {
 document.getElementById('view-board').addEventListener('click', (e) => {
   const sortBtn = e.target.closest('#sort-btn');
   if (sortBtn) return boardSortMenu(sortBtn);
+  const statusBtn = e.target.closest('#status-filter-btn');
+  if (statusBtn) return statusFilterMenu(statusBtn);
   const prioBtn = e.target.closest('#prio-filter-btn');
   if (prioBtn) return priorityFilterMenu(prioBtn);
   const tagBtn = e.target.closest('#tag-filter-btn');
   if (tagBtn) return tagFilterMenu(tagBtn);
-  if (e.target.closest('#clear-filters')) return nav({ q: '', p: '', tag: '' }, { replace: true });
+  if (e.target.closest('#clear-filters')) return nav({ q: '', p: '', tag: '', s: '' }, { replace: true });
   const colBtn = e.target.closest('.col-sort');
   if (colBtn) return columnSortMenu(colBtn, colBtn.dataset.status);
   const more = e.target.closest('.show-more');
@@ -726,15 +738,15 @@ function renderDash() {
   const count = (s) => tickets.filter((t) => t.status === s).length;
   const overdue = tickets.filter(isOverdue);
   const tiles = [
-    { label: 'Open tickets', value: open.length, sub: tickets.length + ' total' },
-    { label: 'In progress', value: count('in-progress'), dot: STATUS_COLOR['in-progress'] },
-    { label: 'Blocked', value: count('blocked'), dot: STATUS_COLOR['blocked'] },
-    { label: 'Done', value: count('done'), dot: STATUS_COLOR['done'] },
-    { label: 'Overdue', value: overdue.length, dot: overdue.length ? 'var(--overdue)' : 'var(--status-todo)' },
+    { label: 'Open tickets', value: open.length, sub: tickets.length + ' total', filter: 'open' },
+    { label: 'In progress', value: count('in-progress'), dot: STATUS_COLOR['in-progress'], filter: 'in-progress' },
+    { label: 'Blocked', value: count('blocked'), dot: STATUS_COLOR['blocked'], filter: 'blocked' },
+    { label: 'Done', value: count('done'), dot: STATUS_COLOR['done'], filter: 'done' },
+    { label: 'Overdue', value: overdue.length, dot: overdue.length ? 'var(--overdue)' : 'var(--status-todo)', filter: 'overdue' },
   ];
   document.getElementById('tiles').innerHTML = tiles.map((t) => `
-    <div class="tile"><div class="tlabel">${t.dot ? `<span class="dot" style="background:${t.dot}"></span>` : ''}${t.label}</div>
-    <div class="tvalue">${t.value}</div>${t.sub ? `<div class="tsub">${t.sub}</div>` : ''}</div>`).join('');
+    <button class="tile" data-filter="${t.filter}" title="Show on the board"><div class="tlabel">${t.dot ? `<span class="dot" style="background:${t.dot}"></span>` : ''}${t.label}</div>
+    <div class="tvalue">${t.value}</div>${t.sub ? `<div class="tsub">${t.sub}</div>` : ''}</button>`).join('');
 
   renderPrioChart(open);
   renderRecentComments();
@@ -997,7 +1009,9 @@ function toggleTheme() {
 
 /* ---------- Routing: view and open ticket live in location.hash ---------- */
 const VIEWS = ['board', 'dash'];
-let route = { view: 'board', ticket: null, q: '', p: '', tag: '' };
+/** Status filter values: any configured status, plus the pseudo-statuses 'open' (not done) and 'overdue'. */
+const STATUS_FILTERS = () => [...config.statuses, 'open', 'overdue'];
+let route = { view: 'board', ticket: null, q: '', p: '', tag: '', s: '' };
 let renderedFilters = null;
 let modalPushed = false;
 
@@ -1011,13 +1025,14 @@ function parseHash() {
     q: p.get('q') || '',
     p: config.priorities.includes(prio) ? prio : '',
     tag: p.get('tag') || '',
+    s: STATUS_FILTERS().includes(p.get('s')) ? p.get('s') : '',
   };
 }
 function hashFor(r) {
   const p = new URLSearchParams();
   if (r.view !== 'board') p.set('view', r.view);
   if (r.ticket) p.set('ticket', r.ticket);
-  for (const key of ['q', 'p', 'tag']) if (r[key]) p.set(key, r[key]);
+  for (const key of ['q', 'p', 'tag', 's']) if (r[key]) p.set(key, r[key]);
   return '#' + p.toString();
 }
 function nav(patch, { replace = false } = {}) {
@@ -1036,7 +1051,7 @@ function applyRoute() {
   }
   document.querySelector('main').classList.toggle('board-mode', route.view === 'board');
   // re-render the board only when the filters changed, so opening a ticket doesn't reset column scroll positions
-  const filterKey = [route.q, route.p, route.tag].join('\u0000');
+  const filterKey = [route.q, route.p, route.tag, route.s].join('\u0000');
   if (filterKey !== renderedFilters) { renderedFilters = filterKey; renderToolbar(); renderBoard(); }
   const t = route.ticket && tickets.find((x) => x.id === route.ticket);
   if (t) renderModal(t);
@@ -1081,6 +1096,10 @@ function renderProgress() {
   el.title = el.ariaLabel = `${done} of ${total} tickets done (${pct}%)`;
   el.innerHTML = `<span class="bar"><span style="width:${pct}%"></span></span><span>${done} / ${total} done</span>`;
 }
+document.getElementById('tiles').addEventListener('click', (e) => {
+  const tile = e.target.closest('.tile');
+  if (tile) nav({ view: 'board', q: '', p: '', tag: '', s: tile.dataset.filter });
+});
 renderThemeToggle();
 renderProgress();
 renderDash();
