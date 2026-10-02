@@ -115,6 +115,7 @@
     color: var(--text-secondary); font-size: 12.5px;
   }
   .since b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .since[hidden] { display: none; }
   .since .btn { margin-left: auto; padding: 3px 9px; }
   .badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); line-height: 15px; }
   .badge.upd { border-color: var(--baseline); color: var(--text-secondary); }
@@ -718,11 +719,12 @@ function renderToolbar() {
      <button class="btn${route.tag ? ' active' : ''}" id="tag-filter-btn" aria-haspopup="menu">${route.tag ? 'Tag: #' + esc(route.tag) : 'Tag'}${caret}</button>
      ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
   document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
-  document.getElementById('tb-sort').innerHTML = route.view === 'list' ? '' :
-    `<button class="btn${groupBy !== 'none' ? ' active' : ''}" id="group-btn" aria-haspopup="menu">Group: ${esc(GROUPS[groupBy].replace(' (first tag)', ''))} <span class="caret">▾</span></button>
+  const boardOnly = route.view === 'list' ? '' : `<button class="btn${groupBy !== 'none' ? ' active' : ''}" id="group-btn" aria-haspopup="menu">Group: ${esc(GROUPS[groupBy].replace(' (first tag)', ''))} <span class="caret">▾</span></button>
      <button class="btn${compact ? ' active' : ''}" id="density-btn" aria-pressed="${compact}" title="Compact cards: just the id and title">Compact</button>
      <button class="btn" id="columns-btn" aria-haspopup="menu">${columnsButtonHtml()}</button>
      <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
+  document.getElementById('tb-sort').innerHTML =
+    `<button class="btn" id="copy-md-btn" title="Copy the tickets in this view as a markdown table">Copy as table</button>` + boardOnly;
 }
 function statusFilterMenu(anchor) {
   openMenu(anchor, [
@@ -772,6 +774,8 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   if (statusBtn) return statusFilterMenu(statusBtn);
   const groupBtn = e.target.closest('#group-btn');
   if (groupBtn) return groupMenu(groupBtn);
+  const copyBtn = e.target.closest('#copy-md-btn');
+  if (copyBtn) return copyView(copyBtn);
   const densityBtn = e.target.closest('#density-btn');
   if (densityBtn) return toggleDensity(densityBtn);
   const colsBtn = e.target.closest('#columns-btn');
@@ -973,6 +977,22 @@ document.addEventListener('click', (e) => {
   renderSince();
   renderBoard();
 });
+
+/* ---------- Copy as markdown ---------- */
+/** The tickets in the current view (filters applied, in board or list order) as a GitHub-flavoured markdown table. */
+function viewAsMarkdown() {
+  const rows = route.view === 'list' ? sortedListRows() : boardOrder(visibleTickets());
+  const cell = (v) => String(v ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+  const lines = ['| ID | Title | Status | Priority | Due |', '| --- | --- | --- | --- | --- |'];
+  for (const t of rows) lines.push(`| ${cell(t.id)} | ${cell(t.title)} | ${cell(statusLabel(t.status))} | ${cell(t.priority)} | ${cell(t.due)} |`);
+  return { text: lines.join('\n'), count: rows.length };
+}
+async function copyView(btn) {
+  const { text, count } = viewAsMarkdown();
+  const label = btn.textContent;
+  btn.textContent = (await copyText(text)) ? `Copied ${count} ✓` : 'Copy failed';
+  setTimeout(() => { btn.textContent = label; }, 1600);
+}
 
 /* ---------- Card density ---------- */
 let compact = loadPref('density', 'comfortable') === 'compact';
