@@ -321,6 +321,14 @@ function chipHtml(ticket) {
 }
 
 /* ---------- Board ---------- */
+/** Column order: config order, except Blocked sits right after In progress so it stays visible. */
+function displayStatuses() {
+  const order = config.statuses.filter((s) => s !== 'blocked');
+  if (!config.statuses.includes('blocked')) return order;
+  const at = order.indexOf('in-progress');
+  order.splice(at === -1 ? order.length : at + 1, 0, 'blocked');
+  return order;
+}
 function renderBoard() {
   const root = document.getElementById('view-board');
   if (tickets.length === 0) {
@@ -328,7 +336,7 @@ function renderBoard() {
     return;
   }
   let html = '<div class="board">';
-  for (const status of config.statuses) {
+  for (const status of displayStatuses()) {
     const items = tickets.filter((t) => t.status === status);
     html += `<div class="col"><div class="col-head">
       <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
