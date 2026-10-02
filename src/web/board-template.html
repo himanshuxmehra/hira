@@ -59,6 +59,8 @@
     line-height: 1.45;
   }
   a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .modal:focus { outline: none; }
 
   header {
     display: flex;
@@ -236,9 +238,9 @@
 
 <header>
   <div class="brand">hira <span class="proj" id="proj-name"></span></div>
-  <div class="tabs" role="tablist">
-    <button id="tab-board" class="active" onclick="showView('board')">Board</button>
-    <button id="tab-dash" onclick="showView('dash')">Dashboard</button>
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button id="tab-board" class="active" role="tab" aria-controls="view-board" onclick="showView('board')">Board</button>
+    <button id="tab-dash" role="tab" aria-controls="view-dash" onclick="showView('dash')">Dashboard</button>
   </div>
   <div class="snapshot-note" id="snapshot-note"></div>
   <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()"></button>
@@ -272,7 +274,7 @@
 </main>
 
 <div class="overlay" id="overlay" onclick="if (event.target === this) closeModal()">
-  <div class="modal" id="modal"></div>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></div>
 </div>
 
 <script>
@@ -507,7 +509,7 @@ function renderBoard() {
         title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
     if (items.length === 0) html += '<div class="empty-col">—</div>';
     for (const t of items) {
-      html += `<div class="card" onclick="openModal('${esc(t.id)}')">
+      html += `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" onclick="openModal('${esc(t.id)}')">
         <div class="cid">${esc(t.id)}</div>
         <div class="ctitle">${esc(t.title)}</div>
         <div class="cmeta">${chipHtml(t)}</div></div>`;
@@ -543,7 +545,7 @@ function renderDash() {
     .sort((a, b) => a.due.localeCompare(b.due))
     .slice(0, 8);
   document.getElementById('due-list').innerHTML = dueSoon.length
-    ? dueSoon.map((t) => `<li onclick="openModal('${esc(t.id)}')">
+    ? dueSoon.map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
         <span class="pwhen${isOverdue(t) ? ' overdue' : ''}">${isOverdue(t) ? 'overdue · ' : ''}${fmtDate(t.due)}</span></li>`).join('')
     : '<li class="none">Nothing with a due date.</li>';
@@ -553,7 +555,7 @@ function renderDash() {
     .sort((a, b) => b.updated.localeCompare(a.updated))
     .slice(0, 8);
   document.getElementById('recent-list').innerHTML = recent.length
-    ? recent.map((t) => `<li onclick="openModal('${esc(t.id)}')">
+    ? recent.map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
         <span class="pwhen">${relTime(t.updated)}</span></li>`).join('')
     : '<li class="none">No activity yet.</li>';
@@ -613,7 +615,7 @@ function renderModal(t) {
   modal.innerHTML = `
     <button class="close" onclick="closeModal()" aria-label="Close">×</button>
     <div class="mid">${esc(t.id)} · created ${fmtDate(t.created)} · updated ${relTime(t.updated)}</div>
-    <h1>${esc(t.title)}</h1>
+    <h1 id="modal-title">${esc(t.title)}</h1>
     <div class="mmeta">
       <span class="chip"><span class="dot" style="background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span>
       ${chipHtml(t)}
@@ -624,10 +626,38 @@ function renderModal(t) {
       ${t.comments.length
         ? t.comments.map((c) => `<div class="comment"><div class="cat">${esc(c.at)}</div><div class="ctext">${esc(c.text)}</div></div>`).join('')
         : '<span style="color:var(--text-muted)">No comments.</span>'}</div>`;
-  document.getElementById('overlay').classList.add('open');
+  const overlay = document.getElementById('overlay');
+  if (!overlay.classList.contains('open')) {
+    lastFocus = document.activeElement;
+    overlay.classList.add('open');
+    setBackgroundInert(true);
+  }
+  modal.querySelector('.close').focus();
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (menuEl) closeMenu(); else closeModal(); }
+  if (e.key === 'Escape') {
+    if (menuEl) { const a = menuAnchor; closeMenu(); if (a && a.isConnected) a.focus(); } else closeModal();
+    return;
+  }
+  const t = e.target;
+  // div[role=button] elements (cards, dashboard rows) behave like real buttons
+  if ((e.key === 'Enter' || e.key === ' ') && t.matches('[role="button"]') && t.tagName !== 'BUTTON') {
+    e.preventDefault();
+    t.click();
+  }
+  // arrow keys move between tabs and menu items
+  if (t.matches('[role="tab"]') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const i = VIEWS.indexOf(route.view) + (e.key === 'ArrowRight' ? 1 : -1);
+    const next = VIEWS[(i + VIEWS.length) % VIEWS.length];
+    showView(next);
+    document.getElementById('tab-' + next).focus();
+  }
+  if (menuEl && menuEl.contains(t) && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault();
+    const items = [...menuEl.querySelectorAll('.menu-item')];
+    const i = items.indexOf(t) + (e.key === 'ArrowDown' ? 1 : -1);
+    items[(i + items.length) % items.length].focus();
+  }
 });
 
 /* ---------- Theme ---------- */
@@ -674,16 +704,28 @@ function applyRoute() {
   route = parseHash();
   for (const v of VIEWS) {
     document.getElementById('view-' + v).classList.toggle('active', route.view === v);
-    document.getElementById('tab-' + v).classList.toggle('active', route.view === v);
+    const tab = document.getElementById('tab-' + v);
+    tab.classList.toggle('active', route.view === v);
+    tab.setAttribute('aria-selected', String(route.view === v));
+    tab.tabIndex = route.view === v ? 0 : -1;
   }
   document.querySelector('main').classList.toggle('board-mode', route.view === 'board');
   const t = route.ticket && tickets.find((x) => x.id === route.ticket);
   if (t) renderModal(t);
   else {
     document.getElementById('overlay').classList.remove('open');
+    setBackgroundInert(false);
     modalPushed = false;
+    if (lastFocus && lastFocus.isConnected) lastFocus.focus();
+    lastFocus = null;
   }
 }
+/* While the dialog is open the page behind it is inert: no tabbing into it, hidden from screen readers. */
+function setBackgroundInert(on) {
+  document.querySelector('header').inert = on;
+  document.querySelector('main').inert = on;
+}
+let lastFocus = null;
 const showView = (view) => nav({ view }, { replace: true });
 window.addEventListener('hashchange', applyRoute);
 
