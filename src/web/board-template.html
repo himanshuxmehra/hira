@@ -312,6 +312,19 @@ function fmtDate(iso) {
   const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 }
+/** Accepts ISO timestamps and the legacy local 'YYYY-MM-DD HH:mm' comment format. */
+function parseWhen(value) {
+  if (!value) return null;
+  const d = new Date(/^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(value) ? value.replace(' ', 'T') : value);
+  return isNaN(d) ? null : d;
+}
+/** Relative time (or a custom label) wrapped in <time> whose tooltip is the exact date and time. */
+function whenHtml(value, label) {
+  const d = parseWhen(value);
+  if (!d) return esc(label ?? value ?? '');
+  const full = d.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' });
+  return `<time datetime="${d.toISOString()}" title="${esc(full)}">${esc(label ?? relTime(d.toISOString()))}</time>`;
+}
 function relTime(iso) {
   if (!iso) return '';
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -578,7 +591,7 @@ function renderDash() {
   document.getElementById('recent-list').innerHTML = recent.length
     ? recent.map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
-        <span class="pwhen">${relTime(t.updated)}</span></li>`).join('')
+        <span class="pwhen">${whenHtml(t.updated)}</span></li>`).join('')
     : '<li class="none">No activity yet.</li>';
 }
 
@@ -635,7 +648,7 @@ function renderModal(t) {
   const modal = document.getElementById('modal');
   modal.innerHTML = `
     <button class="close" onclick="closeModal()" aria-label="Close">×</button>
-    <div class="mid">${esc(t.id)} · created ${fmtDate(t.created)} · updated ${relTime(t.updated)}</div>
+    <div class="mid">${esc(t.id)} · created ${whenHtml(t.created, fmtDate(t.created))} · updated ${whenHtml(t.updated)}</div>
     <h1 id="modal-title">${esc(t.title)}</h1>
     <div class="mmeta">
       <span class="chip"><span class="dot" style="background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span>
