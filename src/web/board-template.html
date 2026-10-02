@@ -100,6 +100,26 @@
   main.board-mode #view-board { flex: 1; min-height: 0; max-width: none; width: 100%; padding-bottom: 20px; display: flex; flex-direction: column; }
 
   /* ---------- Board ---------- */
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex: none; flex-wrap: wrap; }
+  .tb-spacer { flex: 1; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 8px; padding: 5px 10px; cursor: pointer;
+  }
+  .btn:hover { color: var(--text-primary); border-color: var(--baseline); }
+  .btn .caret { font-size: 10px; color: var(--text-muted); }
+  .menu {
+    position: fixed; z-index: 60; min-width: 200px; background: var(--surface-1); border: 1px solid var(--gridline);
+    border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px var(--shadow);
+  }
+  .menu-item {
+    display: flex; width: 100%; gap: 8px; align-items: center; text-align: left; font: inherit; font-size: 13px;
+    color: var(--text-primary); background: none; border: 0; border-radius: 6px; padding: 6px 8px; cursor: pointer;
+  }
+  .menu-item:hover, .menu-item:focus-visible { background: var(--code-bg); outline: none; }
+  .menu-check { width: 14px; color: var(--accent); flex: none; }
+  .menu-sep { height: 1px; background: var(--gridline); margin: 4px 2px; }
+  .board-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .board {
     flex: 1; min-height: 0; display: grid; gap: 14px; overflow-x: auto;
     grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); grid-template-rows: minmax(0, 1fr);
@@ -109,6 +129,14 @@
   .col-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .col-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
   .col-count { margin-left: auto; color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .col-sort {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+    border: 0; border-radius: 6px; background: none; color: var(--text-muted); cursor: pointer; margin-right: 6px;
+  }
+  .col-sort:hover { background: var(--code-bg); color: var(--text-primary); }
+  .col-sort svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .col-sort.active { color: var(--accent); }
+  .col-sort.active::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
   .cards {
     display: flex; flex-direction: column; gap: 8px; min-height: 8px; flex: 1;
     overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--baseline) transparent;
@@ -118,6 +146,7 @@
     body { display: block; height: auto; }
     main, main.board-mode { display: block; overflow: visible; }
     main.board-mode #view-board { display: block; }
+    .board-root { display: block; }
     .board { display: flex; flex-direction: column; overflow: visible; }
     .col { padding-right: 10px; }
     .cards { overflow: visible; padding-right: 0; }
@@ -211,7 +240,10 @@
 </header>
 
 <main>
-  <section id="view-board" class="view active"></section>
+  <section id="view-board" class="view active">
+    <div class="toolbar" id="toolbar"></div>
+    <div class="board-root" id="board-root"></div>
+  </section>
   <section id="view-dash" class="view">
     <div class="tiles" id="tiles"></div>
     <div class="panels">
@@ -329,19 +361,125 @@ function displayStatuses() {
   order.splice(at === -1 ? order.length : at + 1, 0, 'blocked');
   return order;
 }
+/* ---------- Preferences (localStorage; every key is optional) ---------- */
+const loadPref = (key, fallback) => {
+  try { const v = localStorage.getItem('hira-' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
+};
+const savePref = (key, value) => {
+  try { localStorage.setItem('hira-' + key, JSON.stringify(value)); } catch { /* not persisted */ }
+};
+
+/* ---------- Sorting ---------- */
+const ticketNo = (t) => parseInt(String(t.id).split('-').pop(), 10) || 0;
+const prioRank = (t) => config.priorities.indexOf(t.priority);
+const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999');
+const SORTS = {
+  priority: { label: 'Priority', cmp: (a, b) => prioRank(b) - prioRank(a) || byDue(a, b) || ticketNo(a) - ticketNo(b) },
+  due: { label: 'Due date', cmp: (a, b) => byDue(a, b) || prioRank(b) - prioRank(a) || ticketNo(a) - ticketNo(b) },
+  updated: { label: 'Recently updated', cmp: (a, b) => (b.updated || '').localeCompare(a.updated || '') || ticketNo(a) - ticketNo(b) },
+  newest: { label: 'Newest first', cmp: (a, b) => (b.created || '').localeCompare(a.created || '') || ticketNo(b) - ticketNo(a) },
+  id: { label: 'Ticket ID', cmp: (a, b) => ticketNo(a) - ticketNo(b) },
+};
+const DEFAULT_SORT = 'id';
+const sortPrefs = (() => {
+  const p = loadPref('sort', {});
+  const cols = {};
+  for (const [status, key] of Object.entries(p.cols || {})) if (SORTS[key]) cols[status] = key;
+  return { board: SORTS[p.board] ? p.board : DEFAULT_SORT, cols };
+})();
+const sortFor = (status) => sortPrefs.cols[status] || sortPrefs.board;
+function setSort(status, key) {
+  if (status === null) sortPrefs.board = key;
+  else if (key === null) delete sortPrefs.cols[status];
+  else sortPrefs.cols[status] = key;
+  savePref('sort', sortPrefs);
+  renderToolbar();
+  renderBoard();
+}
+
+/* ---------- Popover menu ---------- */
+let menuEl = null, menuAnchor = null;
+function closeMenu() { if (menuEl) menuEl.remove(); menuEl = menuAnchor = null; }
+/** items: [{ label, checked, onPick }] or { sep: true } */
+function openMenu(anchor, items) {
+  if (menuAnchor === anchor) return closeMenu();
+  closeMenu();
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  menuEl.setAttribute('role', 'menu');
+  for (const it of items) {
+    if (it.sep) { menuEl.insertAdjacentHTML('beforeend', '<div class="menu-sep"></div>'); continue; }
+    const b = document.createElement('button');
+    b.className = 'menu-item';
+    b.setAttribute('role', 'menuitem');
+    b.innerHTML = `<span class="menu-check">${it.checked ? '✓' : ''}</span>${esc(it.label)}`;
+    b.onclick = () => { closeMenu(); it.onPick(); };
+    menuEl.appendChild(b);
+  }
+  document.body.appendChild(menuEl);
+  menuAnchor = anchor;
+  const r = anchor.getBoundingClientRect();
+  menuEl.style.top = r.bottom + 4 + 'px';
+  menuEl.style.left = Math.max(8, Math.min(r.right - menuEl.offsetWidth, innerWidth - menuEl.offsetWidth - 8)) + 'px';
+  menuEl.firstElementChild?.focus();
+}
+document.addEventListener('mousedown', (e) => {
+  if (menuEl && !menuEl.contains(e.target) && !(menuAnchor && menuAnchor.contains(e.target))) closeMenu();
+});
+let lastWidth = innerWidth;
+window.addEventListener('resize', () => {
+  // mobile URL-bar show/hide fires resize with an unchanged width; keep the menu then
+  if (innerWidth !== lastWidth) { lastWidth = innerWidth; closeMenu(); }
+});
+
+const SORT_ICON = '<svg viewBox="0 0 24 24"><path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4"/></svg>';
+
+function renderToolbar() {
+  document.getElementById('toolbar').innerHTML = `<div class="tb-spacer"></div>
+    <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)} <span class="caret">▾</span></button>`;
+}
+function boardSortMenu(anchor) {
+  const items = Object.entries(SORTS).map(([key, v]) => ({
+    label: v.label, checked: key === sortPrefs.board, onPick: () => setSort(null, key),
+  }));
+  if (Object.keys(sortPrefs.cols).length) {
+    items.push({ sep: true }, {
+      label: 'Reset column overrides',
+      onPick: () => { sortPrefs.cols = {}; savePref('sort', sortPrefs); renderBoard(); },
+    });
+  }
+  openMenu(anchor, items);
+}
+function columnSortMenu(anchor, status) {
+  const own = sortPrefs.cols[status];
+  const items = [{ label: `Same as board (${SORTS[sortPrefs.board].label})`, checked: !own, onPick: () => setSort(status, null) }, { sep: true }];
+  for (const [key, v] of Object.entries(SORTS)) items.push({ label: v.label, checked: own === key, onPick: () => setSort(status, key) });
+  openMenu(anchor, items);
+}
+document.getElementById('view-board').addEventListener('click', (e) => {
+  const sortBtn = e.target.closest('#sort-btn');
+  if (sortBtn) return boardSortMenu(sortBtn);
+  const colBtn = e.target.closest('.col-sort');
+  if (colBtn) columnSortMenu(colBtn, colBtn.dataset.status);
+});
+
 function renderBoard() {
-  const root = document.getElementById('view-board');
+  const root = document.getElementById('board-root');
   if (tickets.length === 0) {
-    root.innerHTML = `<div class="empty-state">No tickets yet.<br>Create one with <code>hira add "My first task"</code>, then rerun <code>hira board</code>.</div>`;
+    root.innerHTML = `<div class="empty-state">No tickets yet.<br>Create one with <code>hira add "My first task"</code>; the board updates automatically.</div>`;
     return;
   }
   let html = '<div class="board">';
   for (const status of displayStatuses()) {
-    const items = tickets.filter((t) => t.status === status);
+    const sortKey = sortFor(status);
+    const items = tickets.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
+    const overridden = !!sortPrefs.cols[status];
     html += `<div class="col"><div class="col-head">
       <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
       <span class="col-title">${esc(statusLabel(status))}</span>
-      <span class="col-count">${items.length}</span></div><div class="cards">`;
+      <span class="col-count">${items.length}</span>
+      <button class="col-sort${overridden ? ' active' : ''}" data-status="${esc(status)}" aria-haspopup="menu"
+        title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
     if (items.length === 0) html += '<div class="empty-col">—</div>';
     for (const t of items) {
       html += `<div class="card" onclick="openModal('${esc(t.id)}')">
@@ -460,7 +598,9 @@ function renderModal(t) {
         : '<span style="color:var(--text-muted)">No comments.</span>'}</div>`;
   document.getElementById('overlay').classList.add('open');
 }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (menuEl) closeMenu(); else closeModal(); }
+});
 
 /* ---------- Theme ---------- */
 const THEME_ICON = {
@@ -524,6 +664,7 @@ document.title = `hira · ${config.name}`;
 document.getElementById('snapshot-note').innerHTML =
   `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
 renderThemeToggle();
+renderToolbar();
 renderBoard();
 renderDash();
 applyRoute();
