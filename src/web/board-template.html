@@ -142,6 +142,11 @@
     overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--baseline) transparent;
   }
   .cards > * { flex: none; }
+  .show-more {
+    font: inherit; font-size: 12.5px; color: var(--text-secondary); background: none; border: 1px dashed var(--baseline);
+    border-radius: 8px; padding: 7px; cursor: pointer;
+  }
+  .show-more:hover { color: var(--text-primary); border-color: var(--text-muted); }
   @media (max-width: 719px) {
     body { display: block; height: auto; }
     main, main.board-mode { display: block; overflow: visible; }
@@ -460,8 +465,21 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   const sortBtn = e.target.closest('#sort-btn');
   if (sortBtn) return boardSortMenu(sortBtn);
   const colBtn = e.target.closest('.col-sort');
-  if (colBtn) columnSortMenu(colBtn, colBtn.dataset.status);
+  if (colBtn) return columnSortMenu(colBtn, colBtn.dataset.status);
+  const more = e.target.closest('.show-more');
+  if (more) {
+    const status = more.dataset.status;
+    const scroll = more.parentElement.scrollTop;
+    if (expandedCols.has(status)) expandedCols.delete(status); else expandedCols.add(status);
+    renderBoard();
+    const cards = document.querySelector(`.col-sort[data-status="${status}"]`).closest('.col').querySelector('.cards');
+    cards.scrollTop = scroll;
+  }
 });
+
+/** Columns that collapse to their N most recently updated tickets until expanded (per page view). */
+const COLLAPSE_LIMIT = { done: 5 };
+const expandedCols = new Set();
 
 function renderBoard() {
   const root = document.getElementById('board-root');
@@ -472,12 +490,19 @@ function renderBoard() {
   let html = '<div class="board">';
   for (const status of displayStatuses()) {
     const sortKey = sortFor(status);
-    const items = tickets.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
+    const all = tickets.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
+    const limit = COLLAPSE_LIMIT[status];
+    const collapsed = !!limit && all.length > limit && !expandedCols.has(status);
+    let items = all;
+    if (collapsed) {
+      const recent = new Set([...all].sort(SORTS.updated.cmp).slice(0, limit).map((t) => t.id));
+      items = all.filter((t) => recent.has(t.id));
+    }
     const overridden = !!sortPrefs.cols[status];
     html += `<div class="col"><div class="col-head">
       <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
       <span class="col-title">${esc(statusLabel(status))}</span>
-      <span class="col-count">${items.length}</span>
+      <span class="col-count">${all.length}</span>
       <button class="col-sort${overridden ? ' active' : ''}" data-status="${esc(status)}" aria-haspopup="menu"
         title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
     if (items.length === 0) html += '<div class="empty-col">—</div>';
@@ -486,6 +511,9 @@ function renderBoard() {
         <div class="cid">${esc(t.id)}</div>
         <div class="ctitle">${esc(t.title)}</div>
         <div class="cmeta">${chipHtml(t)}</div></div>`;
+    }
+    if (limit && all.length > limit) {
+      html += `<button class="show-more" data-status="${esc(status)}">${collapsed ? `Show ${all.length - limit} more` : 'Show fewer'}</button>`;
     }
     html += '</div></div>';
   }
