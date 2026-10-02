@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { Store, findRoot, initStore } from '../src/core/store.js';
-import { localDate } from '../src/core/ticket.js';
+import { localDate, formatCommentTime } from '../src/core/ticket.js';
 import { generateBoard } from '../src/core/board.js';
 
 const pkgDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -158,7 +158,7 @@ program
     if (t.description) console.log('\n' + t.description);
     if (t.comments.length) {
       console.log('\n' + bold('Comments'));
-      for (const c of t.comments) console.log(dim(`  ${c.at}`) + `  ${c.text.replace(/\n/g, '\n  ')}`);
+      for (const c of t.comments) console.log(dim(`  ${formatCommentTime(c.at)}`) + `  ${c.text.replace(/\n/g, '\n  ')}`);
     }
   });
 

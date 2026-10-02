@@ -96,11 +96,21 @@ function normalizeTimestamp(value) {
   return String(value);
 }
 
-/** Timestamp used in comment entries: local "YYYY-MM-DD HH:mm". */
+/** Timestamp stored on comment entries: an ISO-8601 UTC instant, so it means the same thing in every time zone. */
 export function commentTimestamp(date = new Date()) {
+  return date.toISOString();
+}
+
+/**
+ * Comment timestamp for humans, in local time ("YYYY-MM-DD HH:mm"). Comments written before the ISO switch
+ * were already local "YYYY-MM-DD HH:mm" strings and pass through unchanged.
+ */
+export function formatCommentTime(at) {
+  if (!/^\d{4}-\d\d-\d\dT/.test(at)) return at;
+  const d = new Date(at);
+  if (isNaN(d)) return at;
   const pad = (n) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
-    `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${localDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** Today's local calendar date as YYYY-MM-DD (due dates are local, so never derive this from UTC). */
