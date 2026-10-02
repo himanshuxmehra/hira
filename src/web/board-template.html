@@ -430,7 +430,7 @@ function showView(which) {
 document.getElementById('proj-name').textContent = config.name;
 document.title = `hira · ${config.name}`;
 document.getElementById('snapshot-note').innerHTML =
-  `Snapshot from ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — rerun <code>hira board</code> to refresh`;
+  `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
 renderBoard();
 renderDash();
 </script>

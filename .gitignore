@@ -40,3 +40,7 @@ lerna-debug.log*
 .cache/
 .next/
 out/
+screenshots/
+
+# Generated board (rebuilt by every hira command; run `hira board` after cloning)
+.hira/board.html

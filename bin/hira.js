@@ -43,6 +43,11 @@ function printTicketLine(t, { statuses, priorities }) {
   console.log(line);
 }
 
+/** Keep .hira/board.html in step with the tickets; best-effort so a board failure never fails a command. */
+function refreshBoard(store) {
+  try { generateBoard(store); } catch { /* snapshot refresh is optional */ }
+}
+
 function parseTags(value) {
   return value.split(',').map((t) => t.trim()).filter(Boolean);
 }
@@ -106,6 +111,7 @@ program
     } catch (err) {
       fail(err.message);
     }
+    refreshBoard(store);
     if (opts.json) return console.log(JSON.stringify(ticket, null, 2));
     console.log(green('✓') + ` created ${bold(ticket.id)}: ${ticket.title}`);
   });
@@ -162,6 +168,7 @@ program
     const store = requireStore();
     let t;
     try { t = store.move(id, status); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     const paint = STATUS_PAINT[status] || ((x) => x);
     console.log(green('✓') + ` ${bold(t.id)} → ${paint(status)}`);
   });
@@ -187,6 +194,7 @@ program
     if (Object.keys(patch).length === 0) fail('nothing to change — pass at least one field flag (see `hira edit --help`)');
     let t;
     try { t = store.update(id, patch); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     console.log(green('✓') + ` updated ${bold(t.id)} (${Object.keys(patch).join(', ')})`);
   });
 
@@ -197,6 +205,7 @@ program
     const store = requireStore();
     let t;
     try { t = store.addComment(id, text); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     console.log(green('✓') + ` commented on ${bold(t.id)}`);
   });
 
@@ -207,6 +216,7 @@ program
     const store = requireStore();
     let deleted;
     try { deleted = store.delete(id); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     console.log(green('✓') + ` deleted ${bold(deleted)}`);
   });
 

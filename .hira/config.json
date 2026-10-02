@@ -1,7 +1,7 @@
 {
   "name": "hira",
   "prefix": "HIRA",
-  "nextId": 10,
+  "nextId": 45,
   "statuses": [
     "todo",
     "in-progress",
