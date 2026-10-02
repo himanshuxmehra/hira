@@ -265,7 +265,13 @@
   .comment { border-top: 1px solid var(--gridline); padding: 9px 0; }
   .comment:first-child { border-top: 0; }
   .comment .cat { color: var(--text-muted); font-size: 11.5px; margin-bottom: 2px; }
-  .modal .close { float: right; border: 0; background: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; }
+  .mtools { float: right; display: flex; align-items: center; gap: 2px; color: var(--text-muted); font-size: 12px; }
+  .mtools .step { border: 0; background: none; color: var(--text-muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 7px; border-radius: 6px; }
+  .mtools .step:hover:not(:disabled) { color: var(--text-primary); background: var(--code-bg); }
+  .mtools .step:disabled { opacity: 0.35; cursor: default; }
+  .mtools .pos { font-variant-numeric: tabular-nums; margin-right: 4px; }
+  a.xref { text-decoration: none; border-bottom: 1px dotted currentColor; }
+  .modal .close { border: 0; border: 0; background: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; }
   .modal .close:hover { color: var(--text-primary); }
 
   .empty-state { text-align: center; color: var(--text-muted); padding: 60px 0; }
@@ -376,6 +382,12 @@ function relTime(iso) {
   return fmtDate(iso);
 }
 
+/** Matches [[HIRA-3]] and bare HIRA-3 (the project prefix comes from config). */
+function xrefPattern() {
+  const pfx = String(config.prefix || 'HIRA').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\[\\[(${pfx}-\\d+)\\]\\]|\\b(${pfx}-\\d+)\\b`, 'g');
+}
+
 /* Minimal markdown: headings, bold, italic, inline code, fences, links, bullet/numbered/task lists, blockquotes. */
 function md(text) {
   if (!text) return '';
@@ -418,6 +430,10 @@ function md(text) {
         let url = u.slice(0, u.length - trail.length);
         if ((url.match(/\)/g) || []).length > (url.match(/\(/g) || []).length) { url = url.slice(0, -1); trail = ')' + trail; }
         return hold(`<a href="${url}" target="_blank" rel="noopener">${url}</a>`) + trail;
+      })
+      .replace(xrefPattern(), (m, a, b) => {
+        const id = a || b, ref = tickets.find((x) => x.id === id);
+        return ref ? hold(`<a class="xref" href="#ticket=${id}" data-ticket="${id}" title="${esc(ref.title)}">${id}</a>`) : m;
       })
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>');
@@ -820,10 +836,36 @@ document.getElementById('modal').addEventListener('change', (e) => {
   if (e.target.classList.contains('mv-select')) e.target.closest('.cmd').querySelector('.mv-status').textContent = e.target.value;
 });
 
+/** Tickets in the order the board shows them (columns left→right, each column's sort and the active filters applied). */
+function boardOrder(list) {
+  return displayStatuses().flatMap((status) => list.filter((t) => t.status === status).sort(SORTS[sortFor(status)].cmp));
+}
+function stepList(id) {
+  const visible = boardOrder(visibleTickets());
+  return visible.some((t) => t.id === id) ? visible : boardOrder(tickets);
+}
+function navHtml(t) {
+  const list = stepList(t.id), i = list.findIndex((x) => x.id === t.id);
+  return `<span class="pos">${i + 1} / ${list.length}</span>
+    <button class="step" data-step="-1" aria-label="Previous ticket (k)" title="Previous (k)"${i <= 0 ? ' disabled' : ''}>‹</button>
+    <button class="step" data-step="1" aria-label="Next ticket (j)" title="Next (j)"${i >= list.length - 1 ? ' disabled' : ''}>›</button>`;
+}
+function stepTicket(delta) {
+  if (!route.ticket) return;
+  const list = stepList(route.ticket), i = list.findIndex((x) => x.id === route.ticket) + delta;
+  if (i >= 0 && i < list.length) { nav({ ticket: list[i].id }, { replace: true }); document.getElementById('modal').scrollTop = 0; }
+}
+document.getElementById('modal').addEventListener('click', (e) => {
+  const step = e.target.closest('.step');
+  if (step) return stepTicket(+step.dataset.step);
+  const ref = e.target.closest('a.xref');
+  if (ref) { e.preventDefault(); openModal(ref.dataset.ticket); }
+});
+
 function renderModal(t) {
   const modal = document.getElementById('modal');
   modal.innerHTML = `
-    <button class="close" onclick="closeModal()" aria-label="Close">×</button>
+    <div class="mtools">${navHtml(t)}<button class="close" onclick="closeModal()" aria-label="Close">×</button></div>
     <div class="mid">${esc(t.id)} · created ${whenHtml(t.created, fmtDate(t.created))} · updated ${whenHtml(t.updated)}</div>
     <h1 id="modal-title">${esc(t.title)}</h1>
     <div class="mmeta">
@@ -862,6 +904,10 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   const t = e.target;
+  if (route.ticket && !t.matches('input, textarea, select') && !e.metaKey && !e.ctrlKey) {
+    if (e.key === 'j' || e.key === 'ArrowRight') { e.preventDefault(); return stepTicket(1); }
+    if (e.key === 'k' || e.key === 'ArrowLeft') { e.preventDefault(); return stepTicket(-1); }
+  }
   if (e.key === '/' && !t.matches('input, textarea, select') && !document.getElementById('overlay').classList.contains('open')) {
     const search = document.getElementById('search');
     if (search && route.view === 'board') { e.preventDefault(); search.focus(); search.select(); }
