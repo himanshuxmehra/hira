@@ -220,12 +220,16 @@
   .mdesc h1, .mdesc h2, .mdesc h3 { font-size: 15px; margin: 12px 0 6px; }
   .mdesc ul, .mdesc ol { margin: 0 0 8px 20px; }
   .mdesc code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .mdesc blockquote { border-left: 3px solid var(--baseline); padding-left: 10px; margin: 0 0 8px; color: var(--text-secondary); }
+  .mdesc li.task { list-style: none; margin-left: -18px; }
+  .mdesc input[type="checkbox"] { margin-right: 6px; vertical-align: -1px; }
+  .ctext p { margin: 0 0 6px; }
+  .ctext p:last-child { margin-bottom: 0; }
   .mdesc pre { background: var(--code-bg); padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 0 0 8px; }
   .mdesc pre code { background: none; padding: 0; }
   .comment { border-top: 1px solid var(--gridline); padding: 9px 0; }
   .comment:first-child { border-top: 0; }
   .comment .cat { color: var(--text-muted); font-size: 11.5px; margin-bottom: 2px; }
-  .comment .ctext { white-space: pre-wrap; }
   .modal .close { float: right; border: 0; background: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; }
   .modal .close:hover { color: var(--text-primary); }
 
@@ -320,28 +324,35 @@ function relTime(iso) {
   return fmtDate(iso);
 }
 
-/* Minimal markdown: headings, bold, italic, inline code, fences, links, lists. */
+/* Minimal markdown: headings, bold, italic, inline code, fences, links, bullet/numbered/task lists, blockquotes. */
 function md(text) {
   if (!text) return '';
   const blocks = [];
-  let src = text.replace(/```([\s\S]*?)```/g, (_, code) => {
+  const src = text.replace(/```([\s\S]*?)```/g, (_, code) => {
     blocks.push('<pre><code>' + esc(code.replace(/^\n/, '')) + '</code></pre>');
     return '\u0000' + (blocks.length - 1) + '\u0000';
   });
-  const lines = src.split('\n');
-  let html = '', inList = false, para = [];
+  let html = '', list = null, quote = [], para = [];
   const flushPara = () => { if (para.length) { html += '<p>' + para.join('<br>') + '</p>'; para = []; } };
-  const endList = () => { if (inList) { html += '</ul>'; inList = false; } };
-  for (const raw of lines) {
-    const line = inline(raw);
-    const h = /^(#{1,3}) (.*)/.exec(raw);
-    const li = /^[-*] (.*)/.exec(raw);
-    if (h) { flushPara(); endList(); html += `<h${h[1].length + 1}>${inline(h[2])}</h${h[1].length + 1}>`; }
-    else if (li) { flushPara(); if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(li[1]) + '</li>'; }
-    else if (raw.trim() === '') { flushPara(); endList(); }
-    else { endList(); para.push(line); }
+  const endList = () => { if (list) { html += `</${list}>`; list = null; } };
+  const flushQuote = () => { if (quote.length) { html += '<blockquote>' + quote.map(inline).join('<br>') + '</blockquote>'; quote = []; } };
+  const flushAll = () => { flushPara(); endList(); flushQuote(); };
+  const item = (type, inner, cls = '') => {
+    flushPara(); flushQuote();
+    if (list !== type) { endList(); html += `<${type}>`; list = type; }
+    html += `<li${cls}>${inner}</li>`;
+  };
+  for (const raw of src.split('\n')) {
+    let m;
+    if ((m = /^(#{1,3}) (.*)/.exec(raw))) { flushAll(); html += `<h${m[1].length + 1}>${inline(m[2])}</h${m[1].length + 1}>`; }
+    else if ((m = /^[-*] \[([ xX])\] (.*)/.exec(raw))) item('ul', `<input type="checkbox" disabled${m[1] === ' ' ? '' : ' checked'}> ${inline(m[2])}`, ' class="task"');
+    else if ((m = /^[-*] (.*)/.exec(raw))) item('ul', inline(m[1]));
+    else if ((m = /^\d+[.)] (.*)/.exec(raw))) item('ol', inline(m[1]));
+    else if ((m = /^>\s?(.*)/.exec(raw))) { flushPara(); endList(); quote.push(m[1]); }
+    else if (raw.trim() === '') flushAll();
+    else { endList(); flushQuote(); para.push(inline(raw)); }
   }
-  flushPara(); endList();
+  flushAll();
   return html.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
   function inline(s) {
     return esc(s)
@@ -624,7 +635,7 @@ function renderModal(t) {
       <div class="mdesc">${t.description ? md(t.description) : '<span style="color:var(--text-muted)">No description.</span>'}</div></div>
     <div class="msec"><h3>Comments (${t.comments.length})</h3>
       ${t.comments.length
-        ? t.comments.map((c) => `<div class="comment"><div class="cat">${esc(c.at)}</div><div class="ctext">${esc(c.text)}</div></div>`).join('')
+        ? t.comments.map((c) => `<div class="comment"><div class="cat">${esc(c.at)}</div><div class="ctext mdesc">${md(c.text)}</div></div>`).join('')
         : '<span style="color:var(--text-muted)">No comments.</span>'}</div>`;
   const overlay = document.getElementById('overlay');
   if (!overlay.classList.contains('open')) {
