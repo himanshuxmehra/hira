@@ -227,6 +227,21 @@
   .legend { display: flex; gap: 16px; margin: -4px 0 8px; color: var(--text-secondary); font-size: 12.5px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .ltable-wrap { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; overflow: hidden; }
+  .ltable { width: 100%; border-collapse: collapse; }
+  .ltable th, .ltable td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--gridline); vertical-align: baseline; }
+  .ltable tbody tr:last-child td { border-bottom: 0; }
+  .ltable tbody tr { cursor: pointer; }
+  .ltable tbody tr:hover, .ltable tbody tr:focus-visible { background: var(--code-bg); outline: none; }
+  .ltable .th-sort { font: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); background: none; border: 0; cursor: pointer; padding: 0; }
+  .ltable .th-sort:hover, .ltable .th-sort.active { color: var(--text-primary); }
+  .ltable .arrow { display: inline-block; width: 14px; margin-left: 2px; color: var(--accent); }
+  .ltable .lid { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ltable .ltitle { font-weight: 550; }
+  .ltable .ltags { color: var(--text-muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .ltable .ldue, .ltable .lupd { color: var(--text-secondary); white-space: nowrap; font-size: 12.5px; }
+  .ltable .ldue.overdue { color: var(--overdue); font-weight: 600; }
+  .ltable .lempty { text-align: center; color: var(--text-muted); padding: 30px; }
   .tip {
     position: fixed; z-index: 70; pointer-events: none; display: none; background: var(--surface-1); color: var(--text-primary);
     border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: 0 6px 18px var(--shadow);
@@ -332,6 +347,7 @@
   <div class="brand">hira <span class="proj" id="proj-name"></span></div>
   <div class="tabs" role="tablist" aria-label="Views">
     <button id="tab-board" class="active" role="tab" aria-controls="view-board" onclick="showView('board')">Board</button>
+    <button id="tab-list" role="tab" aria-controls="view-board" onclick="showView('list')">List</button>
     <button id="tab-dash" role="tab" aria-controls="view-dash" onclick="showView('dash')">Dashboard</button>
   </div>
   <div class="progress" id="progress" title="" role="img"></div>
@@ -674,7 +690,7 @@ function renderToolbar() {
      <button class="btn${route.tag ? ' active' : ''}" id="tag-filter-btn" aria-haspopup="menu">${route.tag ? 'Tag: #' + esc(route.tag) : 'Tag'}${caret}</button>
      ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
   document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
-  document.getElementById('tb-sort').innerHTML =
+  document.getElementById('tb-sort').innerHTML = route.view === 'list' ? '' :
     `<button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
 }
 function statusFilterMenu(anchor) {
@@ -756,7 +772,55 @@ document.addEventListener('input', (e) => {
   if (e.target.id === 'search') nav({ q: e.target.value.trim() }, { replace: true });
 });
 
+/* ---------- List view ---------- */
+const LIST_COLUMNS = [
+  { key: 'id', label: 'ID', cmp: (a, b) => ticketNo(a) - ticketNo(b) },
+  { key: 'title', label: 'Title', cmp: (a, b) => a.title.localeCompare(b.title) },
+  { key: 'status', label: 'Status', cmp: (a, b) => displayStatuses().indexOf(a.status) - displayStatuses().indexOf(b.status) },
+  { key: 'priority', label: 'Priority', cmp: (a, b) => prioRank(a) - prioRank(b) },
+  { key: 'due', label: 'Due', cmp: (a, b) => (a.due || '').localeCompare(b.due || ''), emptyLast: (t) => !t.due },
+  { key: 'updated', label: 'Updated', cmp: (a, b) => (a.updated || '').localeCompare(b.updated || '') },
+];
+let listSort = (() => {
+  const p = loadPref('list-sort', {});
+  return { key: LIST_COLUMNS.some((c) => c.key === p.key) ? p.key : 'priority', dir: p.dir === 'asc' ? 'asc' : 'desc' };
+})();
+function sortedListRows() {
+  const col = LIST_COLUMNS.find((c) => c.key === listSort.key), sign = listSort.dir === 'asc' ? 1 : -1;
+  return visibleTickets().sort((a, b) => {
+    if (col.emptyLast && col.emptyLast(a) !== col.emptyLast(b)) return col.emptyLast(a) ? 1 : -1; // blanks stay at the bottom either way
+    return sign * col.cmp(a, b) || ticketNo(a) - ticketNo(b);
+  });
+}
+function renderList() {
+  const rows = sortedListRows();
+  const head = LIST_COLUMNS.map((c) => {
+    const active = c.key === listSort.key;
+    return `<th scope="col" aria-sort="${active ? (listSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
+      <button class="th-sort${active ? ' active' : ''}" data-key="${c.key}">${c.label}<span class="arrow">${active ? (listSort.dir === 'asc' ? '↑' : '↓') : ''}</span></button></th>`;
+  }).join('');
+  const body = rows.map((t) => `<tr tabindex="0" data-id="${esc(t.id)}" onclick="openModal('${esc(t.id)}')">
+      <td class="lid">${esc(t.id)}</td><td class="ltitle">${esc(t.title)}${t.tags.length ? ` <span class="ltags">${t.tags.map((x) => '#' + esc(x)).join(' ')}</span>` : ''}</td>
+      <td><span class="chip"><span class="dot" style="background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span></td>
+      <td><span class="chip"><span class="dot" style="background:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}"></span>${esc(t.priority)}</span></td>
+      <td class="ldue${isOverdue(t) ? ' overdue' : ''}">${t.due ? esc(dueLabel(t)) : ''}</td>
+      <td class="lupd">${whenHtml(t.updated)}</td></tr>`).join('');
+  document.getElementById('board-root').innerHTML = `<div class="ltable-wrap"><table class="ltable"><thead><tr>${head}</tr></thead>
+    <tbody>${body || '<tr><td colspan="6" class="lempty">No tickets match the filters.</td></tr>'}</tbody></table></div>`;
+}
+document.getElementById('view-board').addEventListener('click', (e) => {
+  const th = e.target.closest('.th-sort');
+  if (!th) return;
+  listSort = th.dataset.key === listSort.key
+    ? { key: listSort.key, dir: listSort.dir === 'asc' ? 'desc' : 'asc' }
+    : { key: th.dataset.key, dir: ['id', 'title', 'due', 'status'].includes(th.dataset.key) ? 'asc' : 'desc' };
+  savePref('list-sort', listSort);
+  renderList();
+  document.querySelector(`.th-sort[data-key="${listSort.key}"]`).focus();
+});
+
 function renderBoard() {
+  if (route.view === 'list') return renderList();
   const root = document.getElementById('board-root');
   if (tickets.length === 0) {
     root.innerHTML = `<div class="empty-state">No tickets yet.<br>Create one with <code>hira add "My first task"</code>; the board updates automatically.</div>`;
@@ -1111,7 +1175,7 @@ function boardOrder(list) {
   return displayStatuses().flatMap((status) => list.filter((t) => t.status === status).sort(SORTS[sortFor(status)].cmp));
 }
 function stepList(id) {
-  const visible = boardOrder(visibleTickets());
+  const visible = route.view === 'list' ? sortedListRows() : boardOrder(visibleTickets());
   return visible.some((t) => t.id === id) ? visible : boardOrder(tickets);
 }
 function navHtml(t) {
@@ -1181,11 +1245,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === '/' && !t.matches('input, textarea, select') && !document.getElementById('overlay').classList.contains('open')) {
     const search = document.getElementById('search');
-    if (search && route.view === 'board') { e.preventDefault(); search.focus(); search.select(); }
+    if (search && route.view !== 'dash') { e.preventDefault(); search.focus(); search.select(); }
     return;
   }
   // div[role=button] elements (cards, dashboard rows) behave like real buttons
-  if ((e.key === 'Enter' || e.key === ' ') && t.matches('[role="button"]') && t.tagName !== 'BUTTON') {
+  if ((e.key === 'Enter' || e.key === ' ') && t.matches('[role="button"], tr[data-id]') && t.tagName !== 'BUTTON') {
     e.preventDefault();
     t.click();
   }
@@ -1224,7 +1288,7 @@ function toggleTheme() {
 }
 
 /* ---------- Routing: view and open ticket live in location.hash ---------- */
-const VIEWS = ['board', 'dash'];
+const VIEWS = ['board', 'list', 'dash'];
 /** Status filter values: any configured status, plus the pseudo-statuses 'open' (not done) and 'overdue'. */
 const STATUS_FILTERS = () => [...config.statuses, 'open', 'overdue'];
 let route = { view: 'board', ticket: null, q: '', p: '', tag: '', s: '' };
@@ -1258,8 +1322,10 @@ function nav(patch, { replace = false } = {}) {
 }
 function applyRoute() {
   route = parseHash();
+  // Board and List share one section (and toolbar); only the body differs
+  document.getElementById('view-board').classList.toggle('active', route.view !== 'dash');
+  document.getElementById('view-dash').classList.toggle('active', route.view === 'dash');
   for (const v of VIEWS) {
-    document.getElementById('view-' + v).classList.toggle('active', route.view === v);
     const tab = document.getElementById('tab-' + v);
     tab.classList.toggle('active', route.view === v);
     tab.setAttribute('aria-selected', String(route.view === v));
@@ -1267,7 +1333,7 @@ function applyRoute() {
   }
   document.querySelector('main').classList.toggle('board-mode', route.view === 'board');
   // re-render the board only when the filters changed, so opening a ticket doesn't reset column scroll positions
-  const filterKey = [route.q, route.p, route.tag, route.s].join('\u0000');
+  const filterKey = [route.view === 'list', route.q, route.p, route.tag, route.s].join('\u0000');
   if (filterKey !== renderedFilters) { renderedFilters = filterKey; renderToolbar(); renderBoard(); }
   const t = route.ticket && tickets.find((x) => x.id === route.ticket);
   if (t) renderModal(t);
