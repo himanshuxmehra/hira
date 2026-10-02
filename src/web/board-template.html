@@ -252,6 +252,16 @@
   .ctext p:last-child { margin-bottom: 0; }
   .mdesc pre { background: var(--code-bg); padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 0 0 8px; }
   .mdesc pre code { background: none; padding: 0; }
+  .cmd { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cmd code {
+    flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; background: var(--code-bg); padding: 6px 10px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+  }
+  .cmd select {
+    font: inherit; font-size: 12.5px; color: var(--text-secondary); background: var(--surface-1);
+    border: 1px solid var(--gridline); border-radius: 6px; padding: 4px 6px;
+  }
+  .cmd .btn { flex: none; min-width: 64px; justify-content: center; }
   .comment { border-top: 1px solid var(--gridline); padding: 9px 0; }
   .comment:first-child { border-top: 0; }
   .comment .cat { color: var(--text-muted); font-size: 11.5px; margin-bottom: 2px; }
@@ -782,6 +792,34 @@ function closeModal() {
   if (!route.ticket) return;
   if (modalPushed) { modalPushed = false; history.back(); } else nav({ ticket: null }, { replace: true });
 }
+/** Where a ticket usually goes next, for the pre-selected 'hira move' target. */
+function suggestedStatus(t) {
+  const flow = { 'todo': 'in-progress', 'in-progress': 'done', 'blocked': 'in-progress', 'done': 'todo' };
+  if (flow[t.status] && config.statuses.includes(flow[t.status])) return flow[t.status];
+  const others = config.statuses.filter((x) => x !== t.status);
+  return others[0] || t.status;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through to the legacy path */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { /* clipboard unavailable */ }
+  ta.remove();
+  return ok;
+}
+document.getElementById('modal').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  const label = btn.textContent;
+  btn.textContent = (await copyText(btn.closest('.cmd').querySelector('code').textContent)) ? 'Copied ✓' : 'Select & ⌘C';
+  setTimeout(() => { btn.textContent = label; }, 1400);
+});
+document.getElementById('modal').addEventListener('change', (e) => {
+  if (e.target.classList.contains('mv-select')) e.target.closest('.cmd').querySelector('.mv-status').textContent = e.target.value;
+});
+
 function renderModal(t) {
   const modal = document.getElementById('modal');
   modal.innerHTML = `
@@ -797,7 +835,15 @@ function renderModal(t) {
     <div class="msec"><h3>Comments (${t.comments.length})</h3>
       ${t.comments.length
         ? t.comments.map((c) => `<div class="comment"><div class="cat">${esc(c.at)}</div><div class="ctext mdesc">${md(c.text)}</div></div>`).join('')
-        : '<span style="color:var(--text-muted)">No comments.</span>'}</div>`;
+        : '<span style="color:var(--text-muted)">No comments.</span>'}</div>
+    <div class="msec"><h3>Command line</h3>
+      <div class="cmd"><code>hira move ${esc(t.id)} <span class="mv-status">${esc(suggestedStatus(t))}</span></code>
+        <select class="mv-select" aria-label="Target status">${config.statuses.filter((x) => x !== t.status)
+          .map((x) => `<option value="${esc(x)}"${x === suggestedStatus(t) ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select>
+        <button class="btn copy-btn">Copy</button></div>
+      <div class="cmd"><code>hira comment ${esc(t.id)} ""</code><button class="btn copy-btn">Copy</button></div>
+      <div class="cmd"><code>hira show ${esc(t.id)}</code><button class="btn copy-btn">Copy</button></div>
+      <div class="cmd"><code>.hira/tickets/${esc(t.id)}.md</code><button class="btn copy-btn">Copy path</button></div></div>`;
   const overlay = document.getElementById('overlay');
   if (!overlay.classList.contains('open')) {
     lastFocus = document.activeElement;
