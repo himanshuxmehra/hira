@@ -1058,7 +1058,19 @@ const showView = (view) => nav({ view }, { replace: true });
 window.addEventListener('hashchange', applyRoute);
 
 document.getElementById('proj-name').textContent = config.name;
-document.title = `hira · ${config.name}`;
+function renderTabIdentity() {
+  const open = tickets.filter((t) => t.status !== 'done').length;
+  const blocked = tickets.filter((t) => t.status === 'blocked').length;
+  document.title = `hira · ${config.name}` + (tickets.length ? ` — ${open} open${blocked ? ` · ${blocked} blocked` : ''}` : '');
+  // inline SVG favicon; a red dot marks a board with blocked tickets
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#3987e5"/>
+    <path d="M10 8v16M10 17c0-3 2-5 5-5s5 2 5 5v7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    ${blocked ? '<circle cx="26" cy="6" r="5.5" fill="#d03b3b" stroke="#fff" stroke-width="1.5"/>' : ''}</svg>`;
+  let link = document.querySelector('link[rel="icon"]');
+  if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+  link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+renderTabIdentity();
 document.getElementById('snapshot-note').innerHTML =
   `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
 function renderProgress() {
