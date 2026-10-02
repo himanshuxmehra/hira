@@ -189,6 +189,14 @@
   .card .cicons { margin-left: auto; display: inline-flex; gap: 8px; color: var(--text-muted); font-size: 11.5px; }
   .card .cicons span { display: inline-flex; align-items: center; gap: 3px; }
   .card .cicons svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .board.lanes { display: block; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--baseline) transparent; padding-right: 4px; }
+  .lane-heads, .lane-grid { display: grid; grid-template-columns: repeat(var(--cols), minmax(250px, 1fr)); gap: 14px; }
+  .lane-heads { position: sticky; top: 0; z-index: 2; background: var(--page); padding-bottom: 4px; }
+  .lane-heads .col-head { padding: 6px 8px; }
+  .lane-title { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .lane-title .lane-count { color: var(--text-muted); font-weight: 400; }
+  .lane .cards { overflow: visible; padding-right: 0; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 8px; }
+  @media (max-width: 719px) { .lane-heads { display: none; } .lane-grid { grid-template-columns: 1fr; } }
   .board.compact .card { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; }
   .board.compact .card .chead { flex: none; min-width: 58px; }
   .board.compact .card .cicons, .board.compact .card .cmeta { display: none; }
@@ -700,7 +708,8 @@ function renderToolbar() {
      ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
   document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
   document.getElementById('tb-sort').innerHTML = route.view === 'list' ? '' :
-    `<button class="btn${compact ? ' active' : ''}" id="density-btn" aria-pressed="${compact}" title="Compact cards: just the id and title">Compact</button>
+    `<button class="btn${groupBy !== 'none' ? ' active' : ''}" id="group-btn" aria-haspopup="menu">Group: ${esc(GROUPS[groupBy].replace(' (first tag)', ''))} <span class="caret">▾</span></button>
+     <button class="btn${compact ? ' active' : ''}" id="density-btn" aria-pressed="${compact}" title="Compact cards: just the id and title">Compact</button>
      <button class="btn" id="columns-btn" aria-haspopup="menu">${columnsButtonHtml()}</button>
      <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
 }
@@ -750,6 +759,8 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   if (sortBtn) return boardSortMenu(sortBtn);
   const statusBtn = e.target.closest('#status-filter-btn');
   if (statusBtn) return statusFilterMenu(statusBtn);
+  const groupBtn = e.target.closest('#group-btn');
+  if (groupBtn) return groupMenu(groupBtn);
   const densityBtn = e.target.closest('#density-btn');
   if (densityBtn) return toggleDensity(densityBtn);
   const colsBtn = e.target.closest('#columns-btn');
@@ -763,14 +774,77 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   if (colBtn) return columnSortMenu(colBtn, colBtn.dataset.status);
   const more = e.target.closest('.show-more');
   if (more) {
-    const status = more.dataset.status;
-    const scroll = more.parentElement.scrollTop;
-    if (expandedCols.has(status)) expandedCols.delete(status); else expandedCols.add(status);
+    const key = more.dataset.key;
+    const scroller = more.closest('.board.lanes') || more.parentElement; // lanes scroll as a whole; columns scroll per list
+    const scroll = scroller.scrollTop;
+    if (expandedCols.has(key)) expandedCols.delete(key); else expandedCols.add(key);
     renderBoard();
-    const cards = document.querySelector(`.col-sort[data-status="${status}"]`).closest('.col').querySelector('.cards');
-    cards.scrollTop = scroll;
+    const again = [...document.querySelectorAll('.show-more')].find((b) => b.dataset.key === key);
+    const target = document.querySelector('.board.lanes') || (again && again.parentElement);
+    if (target) target.scrollTop = scroll;
   }
 });
+
+function cardHtml(t) {
+  return `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" style="--prio:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}" onclick="openModal('${esc(t.id)}')">
+    <div class="chead"><span class="cid">${esc(t.id)}</span>${cardIconsHtml(t)}</div>
+    <div class="ctitle">${esc(t.title)}</div>
+    <div class="cmeta">${cardMetaHtml(t)}</div></div>`;
+}
+
+/** Applies COLLAPSE_LIMIT to one column (or one lane cell): keeps the most recently updated tickets until expanded. */
+function collapseItems(all, status, key) {
+  const limit = COLLAPSE_LIMIT[status];
+  const collapsed = !!limit && all.length > limit && !expandedCols.has(key);
+  let items = all;
+  if (collapsed) {
+    const recent = new Set([...all].sort(SORTS.updated.cmp).slice(0, limit).map((t) => t.id));
+    items = all.filter((t) => recent.has(t.id));
+  }
+  const toggle = limit && all.length > limit
+    ? `<button class="show-more" data-key="${esc(key)}">${collapsed ? `Show ${all.length - limit} more` : 'Show fewer'}</button>` : '';
+  return { items, toggle };
+}
+
+/* ---------- Swimlanes ---------- */
+const GROUPS = { none: 'None', priority: 'Priority', tag: 'Tag (first tag)' };
+let groupBy = GROUPS[loadPref('group', 'none')] ? loadPref('group', 'none') : 'none';
+function groupMenu(anchor) {
+  openMenu(anchor, Object.entries(GROUPS).map(([key, label]) => ({
+    label, checked: groupBy === key,
+    onPick: () => { groupBy = key; savePref('group', key); renderToolbar(); renderBoard(); },
+  })));
+}
+/** Lanes in display order: [{ label, color?, tickets }]; empty lanes are dropped. A ticket lives in one lane (its first tag). */
+function lanesFor(list) {
+  let lanes;
+  if (groupBy === 'priority') {
+    lanes = [...config.priorities].reverse().map((p) => ({ label: p, color: PRIO_COLOR[p], tickets: list.filter((t) => t.priority === p) }));
+  } else {
+    const byTag = {};
+    for (const t of list) (byTag[(t.tags || [])[0] || ''] ||= []).push(t);
+    lanes = Object.entries(byTag)
+      .sort((a, b) => (a[0] === '') - (b[0] === '') || b[1].length - a[1].length || a[0].localeCompare(b[0]))
+      .map(([tag, ts]) => ({ label: tag ? '#' + tag : 'No tag', tickets: ts }));
+  }
+  return lanes.filter((l) => l.tickets.length);
+}
+function lanesHtml(list) {
+  const statuses = visibleStatuses(), cols = `style="--cols:${statuses.length}"`;
+  const heads = statuses.map((status) => `<div class="col-head">
+      <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
+      <span class="col-title">${esc(statusLabel(status))}</span>
+      <span class="col-count">${list.filter((t) => t.status === status).length}</span></div>`).join('');
+  const lanes = lanesFor(list).map((lane) => `<section class="lane"><h3 class="lane-title">
+      ${lane.color ? `<span class="col-dot" style="background:${lane.color}"></span>` : ''}${esc(lane.label)}<span class="lane-count">${lane.tickets.length}</span></h3>
+      <div class="lane-grid" ${cols}>${statuses.map((status) => {
+        const all = lane.tickets.filter((t) => t.status === status).sort(SORTS[sortFor(status)].cmp);
+        const { items, toggle } = collapseItems(all, status, `${lane.label}|${status}`);
+        return `<div class="cards">${items.map(cardHtml).join('') || '<div class="empty-col">—</div>'}${toggle}</div>`;
+      }).join('')}</div></section>`).join('');
+  return `<div class="board lanes${compact ? ' compact' : ''}"><div class="lane-heads" ${cols}>${heads}</div>${
+    lanes || '<div class="empty-state">No tickets match the filters.</div>'}</div>`;
+}
 
 /** Columns that collapse to their N most recently updated tickets until expanded (per page view). */
 const COLLAPSE_LIMIT = { done: 5 };
@@ -877,17 +951,12 @@ function renderBoard() {
     return;
   }
   const visible = visibleTickets();
+  if (groupBy !== 'none') { root.innerHTML = lanesHtml(visible); return; }
   let html = `<div class="board${compact ? ' compact' : ''}">`;
   for (const status of visibleStatuses()) {
     const sortKey = sortFor(status);
     const all = visible.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
-    const limit = COLLAPSE_LIMIT[status];
-    const collapsed = !!limit && all.length > limit && !expandedCols.has(status);
-    let items = all;
-    if (collapsed) {
-      const recent = new Set([...all].sort(SORTS.updated.cmp).slice(0, limit).map((t) => t.id));
-      items = all.filter((t) => recent.has(t.id));
-    }
+    const { items, toggle } = collapseItems(all, status, status);
     const overridden = !!sortPrefs.cols[status];
     html += `<div class="col"><div class="col-head">
       <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
@@ -896,16 +965,8 @@ function renderBoard() {
       <button class="col-sort${overridden ? ' active' : ''}" data-status="${esc(status)}" aria-haspopup="menu"
         title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
     if (items.length === 0) html += '<div class="empty-col">—</div>';
-    for (const t of items) {
-      html += `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" style="--prio:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}" onclick="openModal('${esc(t.id)}')">
-        <div class="chead"><span class="cid">${esc(t.id)}</span>${cardIconsHtml(t)}</div>
-        <div class="ctitle">${esc(t.title)}</div>
-        <div class="cmeta">${cardMetaHtml(t)}</div></div>`;
-    }
-    if (limit && all.length > limit) {
-      html += `<button class="show-more" data-status="${esc(status)}">${collapsed ? `Show ${all.length - limit} more` : 'Show fewer'}</button>`;
-    }
-    html += '</div></div>';
+    for (const t of items) html += cardHtml(t);
+    html += toggle + '</div></div>';
   }
   root.innerHTML = html + '</div>';
 }
