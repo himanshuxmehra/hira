@@ -189,6 +189,11 @@
   .card .cicons { margin-left: auto; display: inline-flex; gap: 8px; color: var(--text-muted); font-size: 11.5px; }
   .card .cicons span { display: inline-flex; align-items: center; gap: 3px; }
   .card .cicons svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .board.compact .card { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; }
+  .board.compact .card .chead { flex: none; min-width: 58px; }
+  .board.compact .card .cicons, .board.compact .card .cmeta { display: none; }
+  .board.compact .card .ctitle { margin: 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .board.compact .cards { gap: 5px; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .card .ctitle { font-weight: 550; margin: 2px 0 6px; }
   .card .cmeta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -695,7 +700,8 @@ function renderToolbar() {
      ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
   document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
   document.getElementById('tb-sort').innerHTML = route.view === 'list' ? '' :
-    `<button class="btn" id="columns-btn" aria-haspopup="menu">${columnsButtonHtml()}</button>
+    `<button class="btn${compact ? ' active' : ''}" id="density-btn" aria-pressed="${compact}" title="Compact cards: just the id and title">Compact</button>
+     <button class="btn" id="columns-btn" aria-haspopup="menu">${columnsButtonHtml()}</button>
      <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
 }
 function statusFilterMenu(anchor) {
@@ -744,6 +750,8 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   if (sortBtn) return boardSortMenu(sortBtn);
   const statusBtn = e.target.closest('#status-filter-btn');
   if (statusBtn) return statusFilterMenu(statusBtn);
+  const densityBtn = e.target.closest('#density-btn');
+  if (densityBtn) return toggleDensity(densityBtn);
   const colsBtn = e.target.closest('#columns-btn');
   if (colsBtn) return columnsMenu(colsBtn);
   const prioBtn = e.target.closest('#prio-filter-btn');
@@ -826,6 +834,16 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   document.querySelector(`.th-sort[data-key="${listSort.key}"]`).focus();
 });
 
+/* ---------- Card density ---------- */
+let compact = loadPref('density', 'comfortable') === 'compact';
+function toggleDensity(btn) {
+  compact = !compact;
+  savePref('density', compact ? 'compact' : 'comfortable');
+  btn.classList.toggle('active', compact);
+  btn.setAttribute('aria-pressed', String(compact));
+  renderBoard();
+}
+
 /* ---------- Column visibility ---------- */
 const hiddenCols = new Set(loadPref('hidden-cols', []));
 const visibleStatuses = () => displayStatuses().filter((s) => !hiddenCols.has(s));
@@ -859,7 +877,7 @@ function renderBoard() {
     return;
   }
   const visible = visibleTickets();
-  let html = '<div class="board">';
+  let html = `<div class="board${compact ? ' compact' : ''}">`;
   for (const status of visibleStatuses()) {
     const sortKey = sortFor(status);
     const all = visible.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
