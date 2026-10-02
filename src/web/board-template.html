@@ -104,6 +104,18 @@
   /* ---------- Board ---------- */
   .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex: none; flex-wrap: wrap; }
   .tb-spacer { flex: 1; }
+  .search {
+    display: flex; align-items: center; gap: 6px; height: 30px; min-width: 240px; padding: 0 8px;
+    background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 8px; color: var(--text-muted);
+  }
+  .search:focus-within { border-color: var(--accent); }
+  .search svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; flex: none; }
+  .search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text-primary); font: inherit; font-size: 13px; }
+  .tb-group { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+  .tb-count { color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .btn.active { color: var(--accent); border-color: var(--accent); }
+  .chip.tag { cursor: pointer; }
+  .chip.tag:hover { color: var(--accent); border-color: var(--accent); }
   .btn {
     display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; color: var(--text-secondary);
     background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 8px; padding: 5px 10px; cursor: pointer;
@@ -419,7 +431,7 @@ const ICON_DESC = '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/><
 function cardMetaHtml(t) {
   let out = `<span class="sr-only">Priority: ${esc(t.priority)}</span>`;
   if (t.due) out += `<span class="due${isOverdue(t) ? ' overdue' : ''}" title="${esc(t.due)}">${esc(dueLabel(t))}</span>`;
-  for (const tag of t.tags || []) out += `<span class="chip tag">#${esc(tag)}</span>`;
+  for (const tag of t.tags || []) out += `<span class="chip tag" data-tag="${esc(tag)}" title="Filter by #${esc(tag)}">#${esc(tag)}</span>`;
   return out;
 }
 function cardIconsHtml(t) {
@@ -518,9 +530,60 @@ window.addEventListener('resize', () => {
 
 const SORT_ICON = '<svg viewBox="0 0 24 24"><path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4"/></svg>';
 
+const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+
+/* ---------- Filtering (search / priority / tag; state lives in the URL hash) ---------- */
+const hasFilters = () => !!(route.q || route.p || route.tag);
+function ticketMatches(t) {
+  if (route.p && t.priority !== route.p) return false;
+  if (route.tag && !(t.tags || []).includes(route.tag)) return false;
+  if (route.q) {
+    const hay = [t.id, t.title, t.description, ...(t.tags || [])].join(' ').toLowerCase();
+    if (!route.q.toLowerCase().split(/\s+/).filter(Boolean).every((term) => hay.includes(term))) return false;
+  }
+  return true;
+}
+const visibleTickets = () => tickets.filter(ticketMatches);
+const allTags = () => {
+  const counts = {};
+  for (const t of tickets) for (const tag of t.tags || []) counts[tag] = (counts[tag] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+};
+
 function renderToolbar() {
-  document.getElementById('toolbar').innerHTML = `<div class="tb-spacer"></div>
-    <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)} <span class="caret">▾</span></button>`;
+  const tb = document.getElementById('toolbar');
+  if (!tb.firstElementChild) {
+    tb.innerHTML = `<label class="search">${SEARCH_ICON}<input id="search" type="search" placeholder="Search tickets…  ( / )"
+        aria-label="Search tickets" autocomplete="off" spellcheck="false"></label>
+      <span class="tb-group" id="tb-filters"></span><div class="tb-spacer"></div><span class="tb-count" id="tb-count"></span>
+      <span id="tb-sort"></span>`;
+  }
+  const input = document.getElementById('search');
+  if (document.activeElement !== input) input.value = route.q;
+  const caret = ' <span class="caret">▾</span>';
+  document.getElementById('tb-filters').innerHTML =
+    `<button class="btn${route.p ? ' active' : ''}" id="prio-filter-btn" aria-haspopup="menu">${route.p ? 'Priority: ' + esc(route.p) : 'Priority'}${caret}</button>
+     <button class="btn${route.tag ? ' active' : ''}" id="tag-filter-btn" aria-haspopup="menu">${route.tag ? 'Tag: #' + esc(route.tag) : 'Tag'}${caret}</button>
+     ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
+  document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
+  document.getElementById('tb-sort').innerHTML =
+    `<button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
+}
+function priorityFilterMenu(anchor) {
+  openMenu(anchor, [
+    { label: 'Any priority', checked: !route.p, onPick: () => nav({ p: '' }, { replace: true }) },
+    { sep: true },
+    ...[...config.priorities].reverse().map((p) => ({ label: p, checked: route.p === p, onPick: () => nav({ p }, { replace: true }) })),
+  ]);
+}
+function tagFilterMenu(anchor) {
+  const tags = allTags();
+  if (!tags.length) return;
+  openMenu(anchor, [
+    { label: 'Any tag', checked: !route.tag, onPick: () => nav({ tag: '' }, { replace: true }) },
+    { sep: true },
+    ...tags.map(([tag, n]) => ({ label: `#${tag} (${n})`, checked: route.tag === tag, onPick: () => nav({ tag }, { replace: true }) })),
+  ]);
 }
 function boardSortMenu(anchor) {
   const items = Object.entries(SORTS).map(([key, v]) => ({
@@ -543,6 +606,11 @@ function columnSortMenu(anchor, status) {
 document.getElementById('view-board').addEventListener('click', (e) => {
   const sortBtn = e.target.closest('#sort-btn');
   if (sortBtn) return boardSortMenu(sortBtn);
+  const prioBtn = e.target.closest('#prio-filter-btn');
+  if (prioBtn) return priorityFilterMenu(prioBtn);
+  const tagBtn = e.target.closest('#tag-filter-btn');
+  if (tagBtn) return tagFilterMenu(tagBtn);
+  if (e.target.closest('#clear-filters')) return nav({ q: '', p: '', tag: '' }, { replace: true });
   const colBtn = e.target.closest('.col-sort');
   if (colBtn) return columnSortMenu(colBtn, colBtn.dataset.status);
   const more = e.target.closest('.show-more');
@@ -560,16 +628,28 @@ document.getElementById('view-board').addEventListener('click', (e) => {
 const COLLAPSE_LIMIT = { done: 5 };
 const expandedCols = new Set();
 
+// Capture phase: a tag chip inside a card filters instead of opening the ticket.
+document.getElementById('view-board').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip.tag');
+  if (!chip || !chip.closest('.card')) return;
+  e.stopPropagation();
+  nav({ tag: chip.dataset.tag }, { replace: true });
+}, true);
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'search') nav({ q: e.target.value.trim() }, { replace: true });
+});
+
 function renderBoard() {
   const root = document.getElementById('board-root');
   if (tickets.length === 0) {
     root.innerHTML = `<div class="empty-state">No tickets yet.<br>Create one with <code>hira add "My first task"</code>; the board updates automatically.</div>`;
     return;
   }
+  const visible = visibleTickets();
   let html = '<div class="board">';
   for (const status of displayStatuses()) {
     const sortKey = sortFor(status);
-    const all = tickets.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
+    const all = visible.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
     const limit = COLLAPSE_LIMIT[status];
     const collapsed = !!limit && all.length > limit && !expandedCols.has(status);
     let items = all;
@@ -727,11 +807,20 @@ function renderModal(t) {
   modal.querySelector('.close').focus();
 }
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && e.target.id === 'search' && !menuEl) {
+    if (e.target.value) { e.target.value = ''; nav({ q: '' }, { replace: true }); } else e.target.blur();
+    return;
+  }
   if (e.key === 'Escape') {
     if (menuEl) { const a = menuAnchor; closeMenu(); if (a && a.isConnected) a.focus(); } else closeModal();
     return;
   }
   const t = e.target;
+  if (e.key === '/' && !t.matches('input, textarea, select') && !document.getElementById('overlay').classList.contains('open')) {
+    const search = document.getElementById('search');
+    if (search && route.view === 'board') { e.preventDefault(); search.focus(); search.select(); }
+    return;
+  }
   // div[role=button] elements (cards, dashboard rows) behave like real buttons
   if ((e.key === 'Enter' || e.key === ' ') && t.matches('[role="button"]') && t.tagName !== 'BUTTON') {
     e.preventDefault();
@@ -773,18 +862,27 @@ function toggleTheme() {
 
 /* ---------- Routing: view and open ticket live in location.hash ---------- */
 const VIEWS = ['board', 'dash'];
-let route = { view: 'board', ticket: null };
+let route = { view: 'board', ticket: null, q: '', p: '', tag: '' };
+let renderedFilters = null;
 let modalPushed = false;
 
 function parseHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const view = p.get('view');
-  return { view: VIEWS.includes(view) ? view : 'board', ticket: p.get('ticket') };
+  const prio = p.get('p');
+  return {
+    view: VIEWS.includes(view) ? view : 'board',
+    ticket: p.get('ticket'),
+    q: p.get('q') || '',
+    p: config.priorities.includes(prio) ? prio : '',
+    tag: p.get('tag') || '',
+  };
 }
 function hashFor(r) {
   const p = new URLSearchParams();
   if (r.view !== 'board') p.set('view', r.view);
   if (r.ticket) p.set('ticket', r.ticket);
+  for (const key of ['q', 'p', 'tag']) if (r[key]) p.set(key, r[key]);
   return '#' + p.toString();
 }
 function nav(patch, { replace = false } = {}) {
@@ -802,6 +900,9 @@ function applyRoute() {
     tab.tabIndex = route.view === v ? 0 : -1;
   }
   document.querySelector('main').classList.toggle('board-mode', route.view === 'board');
+  // re-render the board only when the filters changed, so opening a ticket doesn't reset column scroll positions
+  const filterKey = [route.q, route.p, route.tag].join('\u0000');
+  if (filterKey !== renderedFilters) { renderedFilters = filterKey; renderToolbar(); renderBoard(); }
   const t = route.ticket && tickets.find((x) => x.id === route.ticket);
   if (t) renderModal(t);
   else {
@@ -826,8 +927,6 @@ document.title = `hira · ${config.name}`;
 document.getElementById('snapshot-note').innerHTML =
   `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
 renderThemeToggle();
-renderToolbar();
-renderBoard();
 renderDash();
 applyRoute();
 </script>
