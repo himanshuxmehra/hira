@@ -83,6 +83,9 @@
     font: inherit; font-weight: 550; padding: 5px 14px; border-radius: 6px; cursor: pointer;
   }
   .tabs button.active { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px var(--shadow); border: 1px solid var(--border); padding: 4px 13px; }
+  .progress { display: flex; align-items: center; gap: 8px; margin-left: 4px; font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .progress .bar { width: 120px; height: 6px; border-radius: 999px; background: var(--gridline); overflow: hidden; }
+  .progress .bar span { display: block; height: 100%; background: var(--status-done); border-radius: 999px; }
   .snapshot-note { margin-left: auto; color: var(--text-muted); font-size: 12.5px; }
   .snapshot-note code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
 
@@ -290,6 +293,7 @@
     <button id="tab-board" class="active" role="tab" aria-controls="view-board" onclick="showView('board')">Board</button>
     <button id="tab-dash" role="tab" aria-controls="view-dash" onclick="showView('dash')">Dashboard</button>
   </div>
+  <div class="progress" id="progress" title="" role="img"></div>
   <div class="snapshot-note" id="snapshot-note"></div>
   <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()"></button>
 </header>
@@ -1057,7 +1061,16 @@ document.getElementById('proj-name').textContent = config.name;
 document.title = `hira · ${config.name}`;
 document.getElementById('snapshot-note').innerHTML =
   `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
+function renderProgress() {
+  const done = tickets.filter((t) => t.status === 'done').length, total = tickets.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const el = document.getElementById('progress');
+  el.hidden = !total;
+  el.title = el.ariaLabel = `${done} of ${total} tickets done (${pct}%)`;
+  el.innerHTML = `<span class="bar"><span style="width:${pct}%"></span></span><span>${done} / ${total} done</span>`;
+}
 renderThemeToggle();
+renderProgress();
 renderDash();
 applyRoute();
 </script>
