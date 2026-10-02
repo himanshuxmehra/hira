@@ -90,7 +90,7 @@
   .progress { display: flex; align-items: center; gap: 8px; margin-left: 4px; font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   .progress .bar { width: 120px; height: 6px; border-radius: 999px; background: var(--gridline); overflow: hidden; }
   .progress .bar span { display: block; height: 100%; background: var(--status-done); border-radius: 999px; }
-  .snapshot-note { margin-left: auto; color: var(--text-muted); font-size: 12.5px; }
+  .snapshot-note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 12.5px; }
   .snapshot-note code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
 
   .icon-btn {
@@ -109,6 +109,9 @@
   main.board-mode #view-board { flex: 1; min-height: 0; max-width: none; width: 100%; padding-bottom: 20px; display: flex; flex-direction: column; }
 
   /* ---------- Board ---------- */
+  .warn { flex: none; padding: 8px 24px; background: color-mix(in srgb, var(--chip-medium) 16%, var(--surface-1)); border-bottom: 1px solid var(--chip-medium); font-size: 12.5px; color: var(--text-primary); }
+  .warn[hidden] { display: none; }
+  .warn code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
   .since {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; margin-bottom: 12px; padding: 7px 12px;
     background: var(--surface-1); border: 1px solid var(--gridline); border-left: 3px solid var(--accent); border-radius: 8px;
@@ -266,6 +269,13 @@
   .ltable .ldue, .ltable .lupd { color: var(--text-secondary); white-space: nowrap; font-size: 12.5px; }
   .ltable .ldue.overdue { color: var(--overdue); font-weight: 600; }
   .ltable .lempty { text-align: center; color: var(--text-muted); padding: 30px; }
+  .help { padding: 18px 20px; }
+  .help:focus { outline: none; }
+  .help h2 { font-size: 15px; margin-bottom: 10px; }
+  .help dl > div { display: flex; align-items: baseline; gap: 14px; padding: 6px 0; border-bottom: 1px solid var(--gridline); }
+  .help dl > div:last-child { border-bottom: 0; }
+  .help dt { width: 90px; flex: none; }
+  .help dd { color: var(--text-secondary); }
   kbd { font: inherit; font-size: 11px; padding: 0 5px; border: 1px solid var(--baseline); border-radius: 4px; color: var(--text-muted); background: var(--page); }
   #palette-btn kbd { margin-left: 2px; }
   .palette-overlay { z-index: 80; padding-top: 12vh; }
@@ -376,6 +386,24 @@
 
   .empty-state { text-align: center; color: var(--text-muted); padding: 60px 0; }
   .empty-state code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  @media print {
+    :root[data-theme] {
+      color-scheme: light; --surface-1: #fff; --page: #fff; --text-primary: #000; --text-secondary: #333; --text-muted: #666;
+      --gridline: #ccc; --baseline: #999; --code-bg: #eee; --shadow: transparent; --accent: #1a56a0;
+    }
+    body { display: block; height: auto; }
+    header { position: static; padding: 0 0 10px; }
+    .tabs, .progress, .icon-btn, #palette-btn, .toolbar, .since, .warn, .col-sort, .show-more, .menu, .tip { display: none !important; }
+    main, main.board-mode { display: block; overflow: visible; }
+    .view { max-width: none; padding: 0; }
+    main.board-mode #view-board { display: block; max-width: none; padding: 0; }
+    .board { display: grid; grid-template-columns: repeat(4, 1fr); overflow: visible; gap: 8px; }
+    .board.lanes { display: block; }
+    .col, .cards { overflow: visible; }
+    .card, .panel, .tile { break-inside: avoid; }
+    .card { border-color: #aaa; }
+    .overlay { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -391,8 +419,11 @@
   <div class="progress" id="progress" title="" role="img"></div>
   <div class="snapshot-note" id="snapshot-note"></div>
   <button class="btn" id="palette-btn" title="Jump to a ticket" aria-haspopup="dialog">Jump to… <kbd id="palette-kbd">Ctrl K</kbd></button>
+  <button class="icon-btn" id="help-btn" onclick="openHelp()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-haspopup="dialog">?</button>
   <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()"></button>
 </header>
+
+<div class="warn" id="stale-warn" role="status" hidden></div>
 
 <main>
   <section id="view-board" class="view active">
@@ -449,6 +480,21 @@
   </section>
 </main>
 
+<div class="overlay palette-overlay" id="help-overlay" onclick="if (event.target === this) closeHelp()">
+  <div class="palette help" role="dialog" aria-modal="true" aria-labelledby="help-title" tabindex="-1">
+    <h2 id="help-title">Keyboard shortcuts</h2>
+    <dl>
+      <div><dt><kbd>/</kbd></dt><dd>Search tickets</dd></div>
+      <div><dt><kbd>⌘</kbd> <kbd>K</kbd></dt><dd>Jump to a ticket</dd></div>
+      <div><dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next / previous ticket (in an open ticket; ← → also work)</dd></div>
+      <div><dt><kbd>esc</kbd></dt><dd>Close a ticket, menu or this panel; clears search</dd></div>
+      <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Switch tabs (when a tab has focus)</dd></div>
+      <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move within menus and the jump panel</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Show this panel</dd></div>
+    </dl>
+  </div>
+</div>
+
 <div class="overlay palette-overlay" id="palette-overlay" onclick="if (event.target === this) closePalette()">
   <div class="palette" role="dialog" aria-modal="true" aria-label="Jump to a ticket">
     <input id="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
@@ -475,6 +521,8 @@ const STATUS_COLOR = {
   'done': 'var(--status-done)',
   'blocked': 'var(--status-blocked)',
 };
+const EMPTY_TEXT = { 'todo': 'Nothing queued', 'in-progress': 'Nothing in progress', 'blocked': 'Nothing blocked', 'done': 'Nothing done yet' };
+const emptyColHtml = (status) => `<div class="empty-col">${hasFilters() ? 'No matches' : EMPTY_TEXT[status] || 'Nothing here'}</div>`;
 const STATUS_LABEL = { 'todo': 'To do', 'in-progress': 'In progress', 'done': 'Done', 'blocked': 'Blocked', 'open': 'Open', 'overdue': 'Overdue' };
 const PRIO_COLOR = {
   'urgent': 'var(--chip-urgent)', 'high': 'var(--chip-high)',
@@ -883,7 +931,7 @@ function lanesHtml(list) {
       <div class="lane-grid" ${cols}>${statuses.map((status) => {
         const all = lane.tickets.filter((t) => t.status === status).sort(SORTS[sortFor(status)].cmp);
         const { items, toggle } = collapseItems(all, status, `${lane.label}|${status}`);
-        return `<div class="cards">${items.map(cardHtml).join('') || '<div class="empty-col">—</div>'}${toggle}</div>`;
+        return `<div class="cards">${items.map(cardHtml).join('') || emptyColHtml(status)}${toggle}</div>`;
       }).join('')}</div></section>`).join('');
   return `<div class="board lanes${compact ? ' compact' : ''}"><div class="lane-heads" ${cols}>${heads}</div>${
     lanes || '<div class="empty-state">No tickets match the filters.</div>'}</div>`;
@@ -1071,6 +1119,22 @@ document.getElementById('palette-list').addEventListener('click', (e) => {
 document.getElementById('palette-btn').addEventListener('click', openPalette);
 document.getElementById('palette-kbd').textContent = isMac ? '⌘K' : 'Ctrl K';
 
+/* ---------- Shortcuts help (?) ---------- */
+let helpReturn = null;
+function openHelp() {
+  closeMenu();
+  const overlay = document.getElementById('help-overlay');
+  if (overlay.classList.contains('open')) return;
+  helpReturn = document.activeElement;
+  overlay.classList.add('open');
+  overlay.querySelector('.help').focus();
+}
+function closeHelp() {
+  document.getElementById('help-overlay').classList.remove('open');
+  if (helpReturn && helpReturn.isConnected) helpReturn.focus();
+  helpReturn = null;
+}
+
 /* ---------- Copy as markdown ---------- */
 /** The tickets in the current view (filters applied, in board or list order) as a GitHub-flavoured markdown table. */
 function viewAsMarkdown() {
@@ -1143,7 +1207,7 @@ function renderBoard() {
       <span class="col-count">${all.length}</span>
       <button class="col-sort${overridden ? ' active' : ''}" data-status="${esc(status)}" aria-haspopup="menu"
         title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
-    if (items.length === 0) html += '<div class="empty-col">—</div>';
+    if (items.length === 0) html += emptyColHtml(status);
     for (const t of items) html += cardHtml(t);
     html += toggle + '</div></div>';
   }
@@ -1521,6 +1585,11 @@ function renderModal(t) {
 }
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
+  if (document.getElementById('help-overlay').classList.contains('open')) {
+    if (e.key === 'Escape' || e.key === '?') { e.preventDefault(); closeHelp(); }
+    return;
+  }
+  if (e.key === '?' && !e.target.matches('input, textarea, select')) { e.preventDefault(); openHelp(); return; }
   if (document.getElementById('palette-overlay').classList.contains('open')) {
     if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
     else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -1667,8 +1736,17 @@ function renderTabIdentity() {
   link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
 }
 renderTabIdentity();
-document.getElementById('snapshot-note').innerHTML =
-  `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
+/** Header note + a warning when the snapshot is over a day old (agents/CLI refresh it on every change, so this means nothing ran since). */
+function renderSnapshotNote(generated) {
+  const d = new Date(generated), age = Date.now() - d.getTime();
+  const note = document.getElementById('snapshot-note');
+  note.textContent = `Updated ${d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · reload to refresh`;
+  note.title = 'This board is rebuilt on every hira command; reload the page to pick up changes.';
+  const warn = document.getElementById('stale-warn');
+  warn.hidden = age < 86400000;
+  if (!warn.hidden) warn.innerHTML = `This board is a snapshot from <b>${fmtDuration(age)} ago</b>. Run <code>hira board</code> (any <code>hira</code> command refreshes it), then reload.`;
+}
+renderSnapshotNote(generatedAt);
 function renderProgress() {
   const done = tickets.filter((t) => t.status === 'done').length, total = tickets.length;
   const pct = total ? Math.round((done / total) * 100) : 0;
