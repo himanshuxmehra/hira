@@ -222,6 +222,7 @@
   .plist { list-style: none; display: flex; flex-direction: column; }
   .plist li { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--gridline); cursor: pointer; }
   .plist li:last-child { border-bottom: 0; }
+  .plist .sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; align-self: center; }
   .plist .pid { color: var(--text-muted); font-size: 11.5px; flex: none; font-variant-numeric: tabular-nums; }
   .plist .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plist .pwhen { color: var(--text-muted); font-size: 12px; flex: none; }
@@ -818,6 +819,33 @@ function closeModal() {
   if (!route.ticket) return;
   if (modalPushed) { modalPushed = false; history.back(); } else nav({ ticket: null }, { replace: true });
 }
+/**
+ * Other tickets sharing tags, rarest tags counting most. Tags on more than ~40% of tickets (like 'board' in a
+ * board-focused project) say nothing about relatedness, so they are ignored.
+ */
+function relatedTickets(t, limit = 5) {
+  const freq = Object.fromEntries(allTags().map(([tag, n]) => [tag, n]));
+  const useful = (tag) => freq[tag] <= Math.max(5, tickets.length * 0.4);
+  return tickets
+    .filter((x) => x.id !== t.id)
+    .map((x) => {
+      const shared = (x.tags || []).filter((tag) => (t.tags || []).includes(tag) && useful(tag));
+      return { x, shared, score: shared.reduce((sum, tag) => sum + 1 / freq[tag], 0) };
+    })
+    .filter((r) => r.shared.length)
+    .sort((a, b) => b.score - a.score || ticketNo(a.x) - ticketNo(b.x))
+    .slice(0, limit);
+}
+function relatedHtml(t) {
+  const rel = relatedTickets(t);
+  if (!rel.length) return '';
+  return `<div class="msec"><h3>Related tickets</h3><ul class="plist">${rel.map(({ x, shared }) => `
+    <li role="button" tabindex="0" onclick="openModal('${esc(x.id)}')">
+      <span class="sdot" style="background:${STATUS_COLOR[x.status] || 'var(--status-todo)'}" title="${esc(statusLabel(x.status))}"></span>
+      <span class="pid">${esc(x.id)}</span><span class="pt">${esc(x.title)}</span>
+      <span class="pwhen">${shared.map((tag) => '#' + esc(tag)).join(' ')}</span></li>`).join('')}</ul></div>`;
+}
+
 /** Where a ticket usually goes next, for the pre-selected 'hira move' target. */
 function suggestedStatus(t) {
   const flow = { 'todo': 'in-progress', 'in-progress': 'done', 'blocked': 'in-progress', 'done': 'todo' };
@@ -888,6 +916,7 @@ function renderModal(t) {
       ${t.comments.length
         ? t.comments.map((c) => `<div class="comment"><div class="cat">${commentTimeHtml(c.at)}</div><div class="ctext mdesc">${md(c.text)}</div></div>`).join('')
         : '<span style="color:var(--text-muted)">No comments.</span>'}</div>
+    ${relatedHtml(t)}
     <div class="msec"><h3>Command line</h3>
       <div class="cmd"><code>hira move ${esc(t.id)} <span class="mv-status">${esc(suggestedStatus(t))}</span></code>
         <select class="mv-select" aria-label="Target status">${config.statuses.filter((x) => x !== t.status)
