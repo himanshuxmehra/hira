@@ -372,6 +372,11 @@ function whenHtml(value, label) {
   const full = d.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' });
   return `<time datetime="${d.toISOString()}" title="${esc(full)}">${esc(label ?? relTime(d.toISOString()))}</time>`;
 }
+/** Comment time as a readable local date; the tooltip has the exact moment. Unparseable values pass through. */
+function commentTimeHtml(at) {
+  const d = parseWhen(at);
+  return d ? whenHtml(at, d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) : esc(at);
+}
 function relTime(iso) {
   if (!iso) return '';
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -881,7 +886,7 @@ function renderModal(t) {
       <div class="mdesc">${t.description ? md(t.description) : '<span style="color:var(--text-muted)">No description.</span>'}</div></div>
     <div class="msec"><h3>Comments (${t.comments.length})</h3>
       ${t.comments.length
-        ? t.comments.map((c) => `<div class="comment"><div class="cat">${esc(c.at)}</div><div class="ctext mdesc">${md(c.text)}</div></div>`).join('')
+        ? t.comments.map((c) => `<div class="comment"><div class="cat">${commentTimeHtml(c.at)}</div><div class="ctext mdesc">${md(c.text)}</div></div>`).join('')
         : '<span style="color:var(--text-muted)">No comments.</span>'}</div>
     <div class="msec"><h3>Command line</h3>
       <div class="cmd"><code>hira move ${esc(t.id)} <span class="mv-status">${esc(suggestedStatus(t))}</span></code>
