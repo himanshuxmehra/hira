@@ -31,6 +31,8 @@
     --overdue: #d03b3b;
     --code-bg: rgba(255, 255, 255, 0.08);
     --shadow: rgba(0, 0, 0, 0.4);
+    --series-1: #3987e5;
+    --series-2: #d95926;
   }
   :root[data-theme="light"] {
     color-scheme: light;
@@ -46,6 +48,8 @@
     --status-inprogress: #2a78d6;
     --code-bg: rgba(11, 11, 11, 0.06);
     --shadow: rgba(0, 0, 0, 0.08);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
@@ -217,6 +221,30 @@
   .trow .tbar { flex: 1; height: 8px; border-radius: 999px; background: var(--gridline); display: flex; overflow: hidden; }
   .trow .tbar span { display: block; height: 100%; }
   .trow .tcount { width: 40px; flex: none; text-align: right; color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .panel.span2 { grid-column: span 2; }
+  @media (max-width: 900px) { .panel.span2 { grid-column: 1 / -1; } }
+  .panel h2 .hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+  .legend { display: flex; gap: 16px; margin: -4px 0 8px; color: var(--text-secondary); font-size: 12.5px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .tip {
+    position: fixed; z-index: 70; pointer-events: none; display: none; background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: 0 6px 18px var(--shadow);
+  }
+  .tip .tt { color: var(--text-secondary); margin-bottom: 3px; }
+  .tip .tr { display: flex; align-items: center; gap: 8px; }
+  .tip .tr b { margin-left: auto; padding-left: 14px; font-variant-numeric: tabular-nums; }
+  .tip .key { width: 12px; height: 3px; border-radius: 2px; flex: none; }
+  #weekly-chart { width: 100%; height: auto; display: block; }
+  #weekly-chart .grp:hover .hl, #weekly-chart .grp:focus-within .hl { opacity: 1; }
+  #weekly-chart .hl { fill: var(--code-bg); opacity: 0; }
+  #weekly-chart .hit { outline: none; }
+  #weekly-chart .hit:focus-visible { outline: 2px solid var(--accent); }
+  details.tbl { margin-top: 10px; color: var(--text-secondary); font-size: 12.5px; }
+  details.tbl summary { cursor: pointer; color: var(--text-muted); }
+  details.tbl table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  details.tbl th, details.tbl td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--gridline); }
+  details.tbl th:first-child, details.tbl td:first-child { text-align: left; }
   .panel.wide { grid-column: 1 / -1; }
   .clist li { flex-direction: column; gap: 2px; }
   .clist .chead { display: flex; align-items: baseline; gap: 8px; width: 100%; }
@@ -342,6 +370,20 @@
         <h2>Progress by tag</h2>
         <div id="tag-progress"></div>
       </div>
+      <div class="panel">
+        <h2>Stale tickets <span class="hint">open, untouched 14+ days</span></h2>
+        <ul class="plist" id="stale-list"></ul>
+      </div>
+      <div class="panel">
+        <h2>Open tickets by tag</h2>
+        <div id="open-tags"></div>
+      </div>
+      <div class="panel span2">
+        <h2>Created vs completed, by week</h2>
+        <div class="legend" id="weekly-legend"></div>
+        <div class="chart-wrap"><svg id="weekly-chart" role="img" aria-label="Tickets created and completed per week"></svg></div>
+        <details class="tbl"><summary>View as table</summary><table id="weekly-table"></table></details>
+      </div>
       <div class="panel wide">
         <h2>Recent comments</h2>
         <ul class="plist clist" id="comment-list"></ul>
@@ -349,6 +391,8 @@
     </div>
   </section>
 </main>
+
+<div class="tip" id="tip" role="tooltip"></div>
 
 <div class="overlay" id="overlay" onclick="if (event.target === this) closeModal()">
   <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></div>
@@ -771,6 +815,9 @@ function renderDash() {
   renderPrioChart(open);
   renderFlow();
   renderTagProgress();
+  renderStale();
+  renderOpenTags();
+  renderWeekly();
   renderRecentComments();
 
   const dueSoon = tickets
@@ -792,6 +839,112 @@ function renderDash() {
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
         <span class="pwhen">${whenHtml(t.updated)}</span></li>`).join('')
     : '<li class="none">No activity yet.</li>';
+}
+
+/* ---------- Shared chart tooltip ---------- */
+const tipEl = document.getElementById('tip');
+function showTip(html, x, y) {
+  tipEl.innerHTML = html;
+  tipEl.style.display = 'block';
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = Math.max(8, Math.min(x + 14, innerWidth - w - 8)) + 'px';
+  tipEl.style.top = Math.max(8, Math.min(y - h - 10, innerHeight - h - 8)) + 'px';
+}
+const hideTip = () => { tipEl.style.display = 'none'; };
+
+/** Bar with a 4px rounded data end, anchored on the baseline. */
+function roundedBar(x, w, top, base) {
+  const r = Math.min(4, (base - top) / 2, w / 2);
+  return `M${x},${base} L${x},${top + r} Q${x},${top} ${x + r},${top} L${x + w - r},${top} Q${x + w},${top} ${x + w},${top + r} L${x + w},${base} Z`;
+}
+
+/** Stale = open and not updated for 14+ days. */
+function renderStale() {
+  const cutoff = Date.now() - 14 * 86400000;
+  const stale = tickets
+    .filter((t) => t.status !== 'done' && parseWhen(t.updated) && parseWhen(t.updated).getTime() < cutoff)
+    .sort((a, b) => a.updated.localeCompare(b.updated));
+  document.getElementById('stale-list').innerHTML = stale.length
+    ? stale.slice(0, 6).map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
+        <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
+        <span class="pwhen">${whenHtml(t.updated, fmtDuration(Date.now() - parseWhen(t.updated).getTime()))}</span></li>`).join('')
+      + (stale.length > 6 ? `<li class="none">…and ${stale.length - 6} more</li>` : '')
+    : '<li class="none">Nothing stale — every open ticket was touched in the last 14 days.</li>';
+}
+
+function renderOpenTags() {
+  const rows = allTags()
+    .map(([tag]) => ({ tag, n: tickets.filter((t) => t.status !== 'done' && (t.tags || []).includes(tag)).length }))
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag))
+    .slice(0, 8);
+  const max = Math.max(...rows.map((r) => r.n), 1);
+  document.getElementById('open-tags').innerHTML = rows.length
+    ? rows.map((r) => `<button class="trow" data-tag="${esc(r.tag)}" data-open="1" title="${r.n} open — show on the board">
+        <span class="tname">#${esc(r.tag)}</span>
+        <span class="tbar"><span style="width:${(r.n / max) * 100}%;background:var(--series-1);border-radius:0 4px 4px 0"></span></span>
+        <span class="tcount">${r.n}</span></button>`).join('')
+    : '<div class="none">No open tickets with tags.</div>';
+}
+
+/** Calendar weeks (Monday start, local time), oldest first. Completed = done tickets by their last update. */
+function weeklyBuckets(n = 8) {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 7 * (n - 1));
+  const weeks = Array.from({ length: n }, (_, i) => {
+    const from = new Date(start); from.setDate(from.getDate() + 7 * i);
+    const to = new Date(from); to.setDate(to.getDate() + 7);
+    return { from, to, created: 0, completed: 0 };
+  });
+  const bucket = (value) => { const d = parseWhen(value); return d && weeks.find((w) => d >= w.from && d < w.to); };
+  for (const t of tickets) {
+    const c = bucket(t.created); if (c) c.created++;
+    if (t.status === 'done') { const d = bucket(t.updated); if (d) d.completed++; }
+  }
+  return weeks;
+}
+function renderWeekly() {
+  const weeks = weeklyBuckets();
+  const label = (w) => w.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const peak = Math.max(...weeks.flatMap((w) => [w.created, w.completed]), 1);
+  const step = peak <= 5 ? 1 : peak <= 10 ? 2 : peak <= 25 ? 5 : peak <= 50 ? 10 : 25;
+  const top = Math.ceil(peak / step) * step;
+  const W = 800, H = 240, padL = 30, padR = 8, padT = 12, padB = 28;
+  const plotH = H - padT - padB, slot = (W - padL - padR) / weeks.length, bw = Math.min(22, slot * 0.28), gap = 2;
+  const y = (v) => padT + plotH - (v / top) * plotH;
+  let svg = '';
+  for (let v = 0; v <= top; v += step) {
+    svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="${v === 0 ? 'var(--baseline)' : 'var(--gridline)'}" stroke-width="1"/>
+      <text class="bar-label" x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  }
+  weeks.forEach((w, i) => {
+    const cx = padL + slot * i + slot / 2;
+    const x1 = cx - gap / 2 - bw, x2 = cx + gap / 2;
+    const aria = `Week of ${label(w)}: ${w.created} created, ${w.completed} completed`;
+    svg += `<g class="grp"><rect class="hl" x="${padL + slot * i + 3}" y="${padT}" width="${slot - 6}" height="${plotH}" rx="6"/>`;
+    if (w.created) svg += `<path d="${roundedBar(x1, bw, y(w.created), y(0))}" fill="var(--series-1)"/>`;
+    if (w.completed) svg += `<path d="${roundedBar(x2, bw, y(w.completed), y(0))}" fill="var(--series-2)"/>`;
+    svg += `<rect class="hit" data-i="${i}" tabindex="0" role="img" aria-label="${aria}" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${plotH + padB}" fill="transparent"/></g>
+      <text class="bar-label" x="${cx}" y="${H - 8}" text-anchor="middle">${esc(label(w))}</text>`;
+  });
+  const chart = document.getElementById('weekly-chart');
+  chart.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  chart.innerHTML = svg;
+  const tipFor = (w) => `<div class="tt">Week of ${esc(label(w))}</div>
+    <div class="tr"><span class="key" style="background:var(--series-1)"></span>Created<b>${w.created}</b></div>
+    <div class="tr"><span class="key" style="background:var(--series-2)"></span>Completed<b>${w.completed}</b></div>`;
+  chart.querySelectorAll('.hit').forEach((hit) => {
+    const w = weeks[+hit.dataset.i];
+    hit.addEventListener('pointermove', (e) => showTip(tipFor(w), e.clientX, e.clientY));
+    hit.addEventListener('pointerleave', hideTip);
+    hit.addEventListener('focus', () => { const r = hit.getBoundingClientRect(); showTip(tipFor(w), r.left + r.width / 2, r.top + 40); });
+    hit.addEventListener('blur', hideTip);
+  });
+  document.getElementById('weekly-legend').innerHTML =
+    '<span><i style="background:var(--series-1)"></i>Created</span><span><i style="background:var(--series-2)"></i>Completed</span>';
+  document.getElementById('weekly-table').innerHTML =
+    '<thead><tr><th>Week of</th><th>Created</th><th>Completed</th></tr></thead><tbody>' +
+    weeks.map((w) => `<tr><td>${esc(label(w))}</td><td>${w.created}</td><td>${w.completed}</td></tr>`).join('') + '</tbody>';
 }
 
 function fmtDuration(ms) {
@@ -1166,6 +1319,10 @@ document.getElementById('tiles').addEventListener('click', (e) => {
 document.getElementById('tag-progress').addEventListener('click', (e) => {
   const row = e.target.closest('.trow');
   if (row) nav({ view: 'board', q: '', p: '', s: '', tag: row.dataset.tag });
+});
+document.getElementById('open-tags').addEventListener('click', (e) => {
+  const row = e.target.closest('.trow');
+  if (row) nav({ view: 'board', q: '', p: '', s: 'open', tag: row.dataset.tag });
 });
 renderThemeToggle();
 renderProgress();
