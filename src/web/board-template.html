@@ -118,6 +118,7 @@
   .search:focus-within { border-color: var(--accent); }
   .search svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; flex: none; }
   .search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text-primary); font: inherit; font-size: 13px; }
+  #tb-sort { display: inline-flex; gap: 8px; }
   .tb-group { display: inline-flex; gap: 8px; flex-wrap: wrap; }
   .tb-count { color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .btn.active { color: var(--accent); border-color: var(--accent); }
@@ -618,7 +619,7 @@ function setSort(status, key) {
 /* ---------- Popover menu ---------- */
 let menuEl = null, menuAnchor = null;
 function closeMenu() { if (menuEl) menuEl.remove(); menuEl = menuAnchor = null; }
-/** items: [{ label, checked, onPick }] or { sep: true } */
+/** items: [{ label, checked, onPick, keepOpen }] or { sep: true }. A keepOpen item's onPick returns its new checked state. */
 function openMenu(anchor, items) {
   if (menuAnchor === anchor) return closeMenu();
   closeMenu();
@@ -631,7 +632,10 @@ function openMenu(anchor, items) {
     b.className = 'menu-item';
     b.setAttribute('role', 'menuitem');
     b.innerHTML = `<span class="menu-check">${it.checked ? '✓' : ''}</span>${esc(it.label)}`;
-    b.onclick = () => { closeMenu(); it.onPick(); };
+    b.onclick = () => {
+      if (!it.keepOpen) { closeMenu(); return it.onPick(); }
+      b.querySelector('.menu-check').textContent = it.onPick() ? '✓' : '';
+    };
     menuEl.appendChild(b);
   }
   document.body.appendChild(menuEl);
@@ -691,7 +695,8 @@ function renderToolbar() {
      ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
   document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
   document.getElementById('tb-sort').innerHTML = route.view === 'list' ? '' :
-    `<button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
+    `<button class="btn" id="columns-btn" aria-haspopup="menu">${columnsButtonHtml()}</button>
+     <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
 }
 function statusFilterMenu(anchor) {
   openMenu(anchor, [
@@ -739,6 +744,8 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   if (sortBtn) return boardSortMenu(sortBtn);
   const statusBtn = e.target.closest('#status-filter-btn');
   if (statusBtn) return statusFilterMenu(statusBtn);
+  const colsBtn = e.target.closest('#columns-btn');
+  if (colsBtn) return columnsMenu(colsBtn);
   const prioBtn = e.target.closest('#prio-filter-btn');
   if (prioBtn) return priorityFilterMenu(prioBtn);
   const tagBtn = e.target.closest('#tag-filter-btn');
@@ -819,6 +826,31 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   document.querySelector(`.th-sort[data-key="${listSort.key}"]`).focus();
 });
 
+/* ---------- Column visibility ---------- */
+const hiddenCols = new Set(loadPref('hidden-cols', []));
+const visibleStatuses = () => displayStatuses().filter((s) => !hiddenCols.has(s));
+function columnsButtonHtml() {
+  const all = displayStatuses().length, shown = visibleStatuses().length;
+  return `Columns${shown < all ? ` <span class="caret">${shown}/${all}</span>` : ''} <span class="caret">▾</span>`;
+}
+function columnsMenu(anchor) {
+  openMenu(anchor, displayStatuses().map((status) => ({
+    label: statusLabel(status),
+    checked: !hiddenCols.has(status),
+    keepOpen: true,
+    onPick: () => {
+      if (!hiddenCols.has(status)) {
+        if (visibleStatuses().length <= 1) return true; // keep at least one column on screen
+        hiddenCols.add(status);
+      } else hiddenCols.delete(status);
+      savePref('hidden-cols', [...hiddenCols]);
+      anchor.innerHTML = columnsButtonHtml();
+      renderBoard();
+      return !hiddenCols.has(status);
+    },
+  })));
+}
+
 function renderBoard() {
   if (route.view === 'list') return renderList();
   const root = document.getElementById('board-root');
@@ -828,7 +860,7 @@ function renderBoard() {
   }
   const visible = visibleTickets();
   let html = '<div class="board">';
-  for (const status of displayStatuses()) {
+  for (const status of visibleStatuses()) {
     const sortKey = sortFor(status);
     const all = visible.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
     const limit = COLLAPSE_LIMIT[status];
