@@ -401,8 +401,16 @@ function renderPrioChart(open) {
 
 /* ---------- Modal ---------- */
 function openModal(id) {
-  const t = tickets.find((x) => x.id === id);
-  if (!t) return;
+  if (!tickets.some((x) => x.id === id)) return;
+  if (route.ticket) return nav({ ticket: id }, { replace: true });
+  modalPushed = true;
+  nav({ ticket: id });
+}
+function closeModal() {
+  if (!route.ticket) return;
+  if (modalPushed) { modalPushed = false; history.back(); } else nav({ ticket: null }, { replace: true });
+}
+function renderModal(t) {
   const modal = document.getElementById('modal');
   modal.innerHTML = `
     <button class="close" onclick="closeModal()" aria-label="Close">×</button>
@@ -420,15 +428,44 @@ function openModal(id) {
         : '<span style="color:var(--text-muted)">No comments.</span>'}</div>`;
   document.getElementById('overlay').classList.add('open');
 }
-function closeModal() { document.getElementById('overlay').classList.remove('open'); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
-function showView(which) {
-  document.getElementById('view-board').classList.toggle('active', which === 'board');
-  document.getElementById('view-dash').classList.toggle('active', which === 'dash');
-  document.getElementById('tab-board').classList.toggle('active', which === 'board');
-  document.getElementById('tab-dash').classList.toggle('active', which === 'dash');
+/* ---------- Routing: view and open ticket live in location.hash ---------- */
+const VIEWS = ['board', 'dash'];
+let route = { view: 'board', ticket: null };
+let modalPushed = false;
+
+function parseHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const view = p.get('view');
+  return { view: VIEWS.includes(view) ? view : 'board', ticket: p.get('ticket') };
 }
+function hashFor(r) {
+  const p = new URLSearchParams();
+  if (r.view !== 'board') p.set('view', r.view);
+  if (r.ticket) p.set('ticket', r.ticket);
+  return '#' + p.toString();
+}
+function nav(patch, { replace = false } = {}) {
+  const url = hashFor({ ...route, ...patch });
+  if (url === hashFor(route)) return;
+  if (replace) { history.replaceState(null, '', url); applyRoute(); } else location.hash = url;
+}
+function applyRoute() {
+  route = parseHash();
+  for (const v of VIEWS) {
+    document.getElementById('view-' + v).classList.toggle('active', route.view === v);
+    document.getElementById('tab-' + v).classList.toggle('active', route.view === v);
+  }
+  const t = route.ticket && tickets.find((x) => x.id === route.ticket);
+  if (t) renderModal(t);
+  else {
+    document.getElementById('overlay').classList.remove('open');
+    modalPushed = false;
+  }
+}
+const showView = (view) => nav({ view }, { replace: true });
+window.addEventListener('hashchange', applyRoute);
 
 document.getElementById('proj-name').textContent = config.name;
 document.title = `hira · ${config.name}`;
@@ -436,6 +473,7 @@ document.getElementById('snapshot-note').innerHTML =
   `Updated ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — refreshed on every <code>hira</code> change; reload to see it`;
 renderBoard();
 renderDash();
+applyRoute();
 </script>
 </body>
 </html>
