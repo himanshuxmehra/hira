@@ -109,6 +109,15 @@
   main.board-mode #view-board { flex: 1; min-height: 0; max-width: none; width: 100%; padding-bottom: 20px; display: flex; flex-direction: column; }
 
   /* ---------- Board ---------- */
+  .since {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; margin-bottom: 12px; padding: 7px 12px;
+    background: var(--surface-1); border: 1px solid var(--gridline); border-left: 3px solid var(--accent); border-radius: 8px;
+    color: var(--text-secondary); font-size: 12.5px;
+  }
+  .since b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .since .btn { margin-left: auto; padding: 3px 9px; }
+  .badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); line-height: 15px; }
+  .badge.upd { border-color: var(--baseline); color: var(--text-secondary); }
   .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex: none; flex-wrap: wrap; }
   .tb-spacer { flex: 1; }
   .search {
@@ -371,10 +380,12 @@
 
 <main>
   <section id="view-board" class="view active">
+    <div class="since" id="since-board" hidden></div>
     <div class="toolbar" id="toolbar"></div>
     <div class="board-root" id="board-root"></div>
   </section>
   <section id="view-dash" class="view">
+    <div class="since" id="since-dash" hidden></div>
     <div class="tiles" id="tiles"></div>
     <div class="panels">
       <div class="panel">
@@ -785,9 +796,13 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   }
 });
 
+function badgeHtml(t) {
+  const kind = changeKind(t);
+  return kind ? `<span class="badge${kind === 'updated' ? ' upd' : ''}" title="${kind === 'new' ? 'Created' : 'Changed'} since you were last here">${kind === 'new' ? 'new' : 'updated'}</span>` : '';
+}
 function cardHtml(t) {
   return `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" style="--prio:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}" onclick="openModal('${esc(t.id)}')">
-    <div class="chead"><span class="cid">${esc(t.id)}</span>${cardIconsHtml(t)}</div>
+    <div class="chead"><span class="cid">${esc(t.id)}</span>${badgeHtml(t)}${cardIconsHtml(t)}</div>
     <div class="ctitle">${esc(t.title)}</div>
     <div class="cmeta">${cardMetaHtml(t)}</div></div>`;
 }
@@ -889,7 +904,7 @@ function renderList() {
       <button class="th-sort${active ? ' active' : ''}" data-key="${c.key}">${c.label}<span class="arrow">${active ? (listSort.dir === 'asc' ? '↑' : '↓') : ''}</span></button></th>`;
   }).join('');
   const body = rows.map((t) => `<tr tabindex="0" data-id="${esc(t.id)}" onclick="openModal('${esc(t.id)}')">
-      <td class="lid">${esc(t.id)}</td><td class="ltitle">${esc(t.title)}${t.tags.length ? ` <span class="ltags">${t.tags.map((x) => '#' + esc(x)).join(' ')}</span>` : ''}</td>
+      <td class="lid">${esc(t.id)} ${badgeHtml(t)}</td><td class="ltitle">${esc(t.title)}${t.tags.length ? ` <span class="ltags">${t.tags.map((x) => '#' + esc(x)).join(' ')}</span>` : ''}</td>
       <td><span class="chip"><span class="dot" style="background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span></td>
       <td><span class="chip"><span class="dot" style="background:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}"></span>${esc(t.priority)}</span></td>
       <td class="ldue${isOverdue(t) ? ' overdue' : ''}">${t.due ? esc(dueLabel(t)) : ''}</td>
@@ -906,6 +921,57 @@ document.getElementById('view-board').addEventListener('click', (e) => {
   savePref('list-sort', listSort);
   renderList();
   document.querySelector(`.th-sort[data-key="${listSort.key}"]`).focus();
+});
+
+/* ---------- Since your last visit ----------
+ * localStorage keeps when the board was last open; sessionStorage pins that moment for this tab, so reloading
+ * to pick up fresh data keeps showing what changed instead of wiping the markers. */
+let since = (() => {
+  try {
+    const kept = sessionStorage.getItem('hira-since');
+    if (kept !== null) return kept ? +kept : null;
+    const prev = localStorage.getItem('hira-last-visit');
+    sessionStorage.setItem('hira-since', prev || '');
+    return prev ? +prev : null;
+  } catch { return null; }
+})();
+function stampVisit() { try { localStorage.setItem('hira-last-visit', String(Date.now())); } catch { /* not persisted */ } }
+window.addEventListener('pagehide', stampVisit);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') stampVisit(); });
+const stampOf = (v) => { const d = parseWhen(v); return d ? d.getTime() : 0; };
+/** 'new' (created since), 'updated' (changed since), or null. */
+function changeKind(t) {
+  if (since == null) return null;
+  if (stampOf(t.created) > since) return 'new';
+  return stampOf(t.updated) > since ? 'updated' : null;
+}
+function renderSince() {
+  let html = '';
+  if (since != null) {
+    const nNew = tickets.filter((t) => changeKind(t) === 'new').length;
+    const nUpd = tickets.filter((t) => changeKind(t) === 'updated').length;
+    const nDone = tickets.filter((t) => t.status === 'done' && stampOf(t.updated) > since).length;
+    const nComments = tickets.reduce((n, t) => n + t.comments.filter((c) => stampOf(c.at) > since).length, 0);
+    const parts = [[nNew, 'new'], [nUpd, 'updated'], [nDone, 'completed'], [nComments, nComments === 1 ? 'comment' : 'comments']]
+      .filter(([n]) => n).map(([n, label]) => `<b>${n}</b> ${label}`);
+    if (parts.length) {
+      html = `<span>Since you were last here (${whenHtml(new Date(since).toISOString())}):</span> ${parts.join(' · ')}
+        <button class="btn" id="mark-seen">Mark all seen</button>`;
+    }
+  }
+  for (const id of ['since-board', 'since-dash']) {
+    const el = document.getElementById(id);
+    el.innerHTML = html;
+    el.hidden = !html;
+  }
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#mark-seen')) return;
+  since = Date.now();
+  try { sessionStorage.setItem('hira-since', String(since)); } catch { /* ignore */ }
+  stampVisit();
+  renderSince();
+  renderBoard();
 });
 
 /* ---------- Card density ---------- */
@@ -1502,6 +1568,7 @@ document.getElementById('open-tags').addEventListener('click', (e) => {
   if (row) nav({ view: 'board', q: '', p: '', s: 'open', tag: row.dataset.tag });
 });
 renderThemeToggle();
+renderSince();
 renderProgress();
 renderDash();
 applyRoute();
