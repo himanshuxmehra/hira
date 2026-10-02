@@ -211,6 +211,12 @@
   .kv .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
   .kv .v small { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
   .kv[role="button"] { cursor: pointer; }
+  .trow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  .trow:hover .tname { color: var(--accent); }
+  .trow .tname { width: 96px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+  .trow .tbar { flex: 1; height: 8px; border-radius: 999px; background: var(--gridline); display: flex; overflow: hidden; }
+  .trow .tbar span { display: block; height: 100%; }
+  .trow .tcount { width: 40px; flex: none; text-align: right; color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .panel.wide { grid-column: 1 / -1; }
   .clist li { flex-direction: column; gap: 2px; }
   .clist .chead { display: flex; align-items: baseline; gap: 8px; width: 100%; }
@@ -331,6 +337,10 @@
       <div class="panel">
         <h2>Flow</h2>
         <div id="flow-stats"></div>
+      </div>
+      <div class="panel">
+        <h2>Progress by tag</h2>
+        <div id="tag-progress"></div>
       </div>
       <div class="panel wide">
         <h2>Recent comments</h2>
@@ -760,6 +770,7 @@ function renderDash() {
 
   renderPrioChart(open);
   renderFlow();
+  renderTagProgress();
   renderRecentComments();
 
   const dueSoon = tickets
@@ -791,6 +802,21 @@ function fmtDuration(ms) {
   return Math.round(days / 30) + ' months';
 }
 /** Cycle time = created → last update of a done ticket (updated is the best "finished" signal the files carry). */
+/** One row per tag (largest first): done / in progress / remaining as a segmented bar. */
+function renderTagProgress() {
+  const rows = allTags().map(([tag]) => {
+    const group = tickets.filter((t) => (t.tags || []).includes(tag));
+    const done = group.filter((t) => t.status === 'done').length;
+    const active = group.filter((t) => t.status === 'in-progress').length;
+    return { tag, total: group.length, done, active };
+  }).sort((a, b) => b.total - a.total || a.tag.localeCompare(b.tag)).slice(0, 8);
+  document.getElementById('tag-progress').innerHTML = rows.length
+    ? rows.map((r) => `<button class="trow" data-tag="${esc(r.tag)}" title="${r.done} done, ${r.active} in progress, ${r.total - r.done - r.active} to go — show on the board">
+        <span class="tname">#${esc(r.tag)}</span>
+        <span class="tbar"><span style="width:${(r.done / r.total) * 100}%;background:var(--status-done)"></span><span style="width:${(r.active / r.total) * 100}%;background:var(--status-inprogress)"></span></span>
+        <span class="tcount">${r.done}/${r.total}</span></button>`).join('')
+    : '<div class="none">No tags yet.</div>';
+}
 function renderFlow() {
   const WEEK = 7 * 86400000, now = Date.now();
   const at = (v) => { const d = parseWhen(v); return d ? d.getTime() : null; };
@@ -1136,6 +1162,10 @@ function renderProgress() {
 document.getElementById('tiles').addEventListener('click', (e) => {
   const tile = e.target.closest('.tile');
   if (tile) nav({ view: 'board', q: '', p: '', tag: '', s: tile.dataset.filter });
+});
+document.getElementById('tag-progress').addEventListener('click', (e) => {
+  const row = e.target.closest('.trow');
+  if (row) nav({ view: 'board', q: '', p: '', s: '', tag: row.dataset.tag });
 });
 renderThemeToggle();
 renderProgress();
