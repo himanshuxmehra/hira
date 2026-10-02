@@ -19,10 +19,6 @@
     --status-done: #0ca30c;
     --status-blocked: #d03b3b;
     --status-todo: #898781;
-    --prio-low: #86b6ef;
-    --prio-medium: #5598e7;
-    --prio-high: #2a78d6;
-    --prio-urgent: #1c5cab;
     --chip-urgent: #d03b3b;
     --chip-high: #ec835a;
     --chip-medium: #fab219;
@@ -42,10 +38,6 @@
       --border: rgba(255, 255, 255, 0.10);
       --accent: #3987e5;
       --status-inprogress: #3987e5;
-      --prio-low: #184f95;
-      --prio-medium: #256abf;
-      --prio-high: #3987e5;
-      --prio-urgent: #6da7ec;
       --code-bg: rgba(255, 255, 255, 0.08);
     }
   }
@@ -222,13 +214,9 @@ const STATUS_COLOR = {
   'blocked': 'var(--status-blocked)',
 };
 const STATUS_LABEL = { 'todo': 'To do', 'in-progress': 'In progress', 'done': 'Done', 'blocked': 'Blocked' };
-const PRIO_CHIP = {
+const PRIO_COLOR = {
   'urgent': 'var(--chip-urgent)', 'high': 'var(--chip-high)',
   'medium': 'var(--chip-medium)', 'low': 'var(--chip-low)',
-};
-const PRIO_BAR = {
-  'low': 'var(--prio-low)', 'medium': 'var(--prio-medium)',
-  'high': 'var(--prio-high)', 'urgent': 'var(--prio-urgent)',
 };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -290,7 +278,7 @@ function md(text) {
 }
 
 function chipHtml(ticket) {
-  let out = `<span class="chip"><span class="dot" style="background:${PRIO_CHIP[ticket.priority] || 'var(--chip-low)'}"></span>${esc(ticket.priority)}</span>`;
+  let out = `<span class="chip"><span class="dot" style="background:${PRIO_COLOR[ticket.priority] || 'var(--chip-low)'}"></span>${esc(ticket.priority)}</span>`;
   if (ticket.due) out += `<span class="due${isOverdue(ticket) ? ' overdue' : ''}">due ${fmtDate(ticket.due)}</span>`;
   for (const tag of ticket.tags || []) out += `<span class="chip tag">#${esc(tag)}</span>`;
   return out;
@@ -376,7 +364,7 @@ function renderPrioChart(open) {
     const y = H - padB - h;
     const r = Math.min(4, h / 2);
     if (h > 0) {
-      s += `<path class="bar" data-i="${i}" d="M${cx - barW / 2},${H - padB} L${cx - barW / 2},${y + r} Q${cx - barW / 2},${y} ${cx - barW / 2 + r},${y} L${cx + barW / 2 - r},${y} Q${cx + barW / 2},${y} ${cx + barW / 2},${y + r} L${cx + barW / 2},${H - padB} Z" fill="${PRIO_BAR[p]}"/>`;
+      s += `<path class="bar" data-i="${i}" d="M${cx - barW / 2},${H - padB} L${cx - barW / 2},${y + r} Q${cx - barW / 2},${y} ${cx - barW / 2 + r},${y} L${cx + barW / 2 - r},${y} Q${cx + barW / 2},${y} ${cx + barW / 2},${y + r} L${cx + barW / 2},${H - padB} Z" fill="${PRIO_COLOR[p]}"/>`;
       s += `<text class="bar-value" x="${cx}" y="${y - 6}" text-anchor="middle">${counts[i]}</text>`;
     } else {
       s += `<text class="bar-value" x="${cx}" y="${H - padB - 6}" text-anchor="middle" opacity="0.5">0</text>`;
