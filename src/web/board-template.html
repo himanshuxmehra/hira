@@ -270,6 +270,8 @@
   .mtools .step:hover:not(:disabled) { color: var(--text-primary); background: var(--code-bg); }
   .mtools .step:disabled { opacity: 0.35; cursor: default; }
   .mtools .pos { font-variant-numeric: tabular-nums; margin-right: 4px; }
+  a.commit { text-decoration: none; }
+  a.commit code { color: var(--accent); }
   a.xref { text-decoration: none; border-bottom: 1px dotted currentColor; }
   .modal .close { border: 0; border: 0; background: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; }
   .modal .close:hover { color: var(--text-primary); }
@@ -329,7 +331,7 @@
 <script>
 'use strict';
 const DATA = JSON.parse(document.getElementById('hira-data').textContent);
-const { config, tickets, generatedAt } = DATA;
+const { config, tickets, generatedAt, commitUrl } = DATA;
 
 const STATUS_COLOR = {
   'todo': 'var(--status-todo)',
@@ -435,6 +437,9 @@ function md(text) {
         const id = a || b, ref = tickets.find((x) => x.id === id);
         return ref ? hold(`<a class="xref" href="#ticket=${id}" data-ticket="${id}" title="${esc(ref.title)}">${id}</a>`) : m;
       })
+      // commit hashes (needs both a digit and a letter, to skip plain numbers and ordinary words)
+      .replace(/\b[0-9a-f]{7,40}\b/g, (h) => commitUrl && /\d/.test(h) && /[a-f]/.test(h)
+        ? hold(`<a class="commit" href="${commitUrl}${h}" target="_blank" rel="noopener"><code>${h.slice(0, 7)}</code></a>`) : h)
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>');
     return out.replace(/\u0001(\d+)\u0001/g, (_, i) => stash[+i]);

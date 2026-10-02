@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseTicket, serializeTicket, localDate, commentTimestamp, formatCommentTime } from '../src/core/ticket.js';
 import { initStore, findRoot, Store } from '../src/core/store.js';
+import { commitUrlFromRemote } from '../src/core/board.js';
 
 test('ticket roundtrip: serialize then parse preserves everything', () => {
   const ticket = {
@@ -94,4 +95,14 @@ test('comment timestamps are ISO; legacy local stamps still display', () => {
   // and they survive a serialize/parse roundtrip
   const t = parseTicket(serializeTicket({ id: 'X-1', title: 't', status: 'todo', priority: 'low', tags: [], comments: [{ at, text: 'hi' }] }));
   assert.equal(t.comments[0].at, at);
+});
+
+test('commitUrlFromRemote handles common remote formats', () => {
+  const gh = 'https://github.com/o/r/commit/';
+  assert.equal(commitUrlFromRemote('https://github.com/o/r.git'), gh);
+  assert.equal(commitUrlFromRemote('git@github.com:o/r.git'), gh);
+  assert.equal(commitUrlFromRemote('ssh://git@github.com/o/r'), gh);
+  assert.equal(commitUrlFromRemote('https://gitlab.com/g/sub/r.git'), 'https://gitlab.com/g/sub/r/-/commit/');
+  assert.equal(commitUrlFromRemote('https://example.com/o/r.git'), null);
+  assert.equal(commitUrlFromRemote(''), null);
 });
