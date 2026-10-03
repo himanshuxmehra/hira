@@ -4,8 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hira board</title>
+<script>
+  try { document.documentElement.dataset.theme = localStorage.getItem('hira-theme') || 'dark'; }
+  catch { document.documentElement.dataset.theme = 'dark'; }
+</script>
 <style>
   :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --status-inprogress: #3987e5;
+    --status-done: #0ca30c;
+    --status-blocked: #d03b3b;
+    --status-todo: #898781;
+    --chip-urgent: #d03b3b;
+    --chip-high: #ec835a;
+    --chip-medium: #fab219;
+    --chip-low: #898781;
+    --overdue: #d03b3b;
+    --code-bg: rgba(255, 255, 255, 0.08);
+    --shadow: rgba(0, 0, 0, 0.4);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
     --surface-1: #fcfcfb;
     --page: #f9f9f7;
     --text-primary: #0b0b0b;
@@ -16,42 +46,16 @@
     --border: rgba(11, 11, 11, 0.10);
     --accent: #2a78d6;
     --status-inprogress: #2a78d6;
-    --status-done: #0ca30c;
-    --status-blocked: #d03b3b;
-    --status-todo: #898781;
-    --prio-low: #86b6ef;
-    --prio-medium: #5598e7;
-    --prio-high: #2a78d6;
-    --prio-urgent: #1c5cab;
-    --chip-urgent: #d03b3b;
-    --chip-high: #ec835a;
-    --chip-medium: #fab219;
-    --chip-low: #898781;
-    --overdue: #d03b3b;
     --code-bg: rgba(11, 11, 11, 0.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --surface-1: #1a1a19;
-      --page: #0d0d0d;
-      --text-primary: #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted: #898781;
-      --gridline: #2c2c2a;
-      --baseline: #383835;
-      --border: rgba(255, 255, 255, 0.10);
-      --accent: #3987e5;
-      --status-inprogress: #3987e5;
-      --prio-low: #184f95;
-      --prio-medium: #256abf;
-      --prio-high: #3987e5;
-      --prio-urgent: #6da7ec;
-      --code-bg: rgba(255, 255, 255, 0.08);
-    }
+    --shadow: rgba(0, 0, 0, 0.08);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
   body {
+    display: flex;
+    flex-direction: column;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
     background: var(--page);
     color: var(--text-primary);
@@ -59,6 +63,8 @@
     line-height: 1.45;
   }
   a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .modal:focus { outline: none; }
 
   header {
     display: flex;
@@ -71,6 +77,7 @@
     top: 0;
     z-index: 10;
     flex-wrap: wrap;
+    flex: none;
   }
   .brand { font-weight: 650; font-size: 16px; letter-spacing: -0.01em; }
   .brand .proj { color: var(--text-secondary); font-weight: 450; }
@@ -79,28 +86,140 @@
     border: 0; background: transparent; color: var(--text-secondary);
     font: inherit; font-weight: 550; padding: 5px 14px; border-radius: 6px; cursor: pointer;
   }
-  .tabs button.active { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.08); border: 1px solid var(--border); padding: 4px 13px; }
-  .snapshot-note { margin-left: auto; color: var(--text-muted); font-size: 12.5px; }
+  .tabs button.active { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px var(--shadow); border: 1px solid var(--border); padding: 4px 13px; }
+  .progress { display: flex; align-items: center; gap: 8px; margin-left: 4px; font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .progress .bar { width: 120px; height: 6px; border-radius: 999px; background: var(--gridline); overflow: hidden; }
+  .progress .bar span { display: block; height: 100%; background: var(--status-done); border-radius: 999px; }
+  .snapshot-note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 12.5px; }
   .snapshot-note code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
 
-  main { padding: 20px 24px 48px; max-width: 1280px; margin: 0 auto; }
-  .view { display: none; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border: 1px solid var(--gridline); border-radius: 8px;
+    background: var(--page); color: var(--text-secondary); cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--text-primary); border-color: var(--baseline); }
+  .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  main { flex: 1; min-height: 0; overflow-y: auto; }
+  .view { display: none; max-width: 1280px; margin: 0 auto; padding: 20px 24px 48px; }
   .view.active { display: block; }
+  /* Board tab: the page itself never scrolls; each column does. */
+  main.board-mode { overflow: hidden; display: flex; flex-direction: column; }
+  main.board-mode #view-board { flex: 1; min-height: 0; max-width: none; width: 100%; padding-bottom: 20px; display: flex; flex-direction: column; }
 
   /* ---------- Board ---------- */
-  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; align-items: start; }
-  .col { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 10px; }
+  .warn { flex: none; padding: 8px 24px; background: color-mix(in srgb, var(--chip-medium) 16%, var(--surface-1)); border-bottom: 1px solid var(--chip-medium); font-size: 12.5px; color: var(--text-primary); }
+  .warn[hidden] { display: none; }
+  .warn code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .since {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none; margin-bottom: 12px; padding: 7px 12px;
+    background: var(--surface-1); border: 1px solid var(--gridline); border-left: 3px solid var(--accent); border-radius: 8px;
+    color: var(--text-secondary); font-size: 12.5px;
+  }
+  .since b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .since[hidden] { display: none; }
+  .since .btn { margin-left: auto; padding: 3px 9px; }
+  .badge { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); line-height: 15px; }
+  .badge.upd { border-color: var(--baseline); color: var(--text-secondary); }
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex: none; flex-wrap: wrap; }
+  .tb-spacer { flex: 1; }
+  .search {
+    display: flex; align-items: center; gap: 6px; height: 30px; min-width: 240px; padding: 0 8px;
+    background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 8px; color: var(--text-muted);
+  }
+  .search:focus-within { border-color: var(--accent); }
+  .search svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; flex: none; }
+  .search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text-primary); font: inherit; font-size: 13px; }
+  #tb-sort { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+  .tb-group { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+  .tb-count { color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .btn.active { color: var(--accent); border-color: var(--accent); }
+  .chip.tag { cursor: pointer; }
+  .chip.tag:hover { color: var(--accent); border-color: var(--accent); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 8px; padding: 5px 10px; cursor: pointer;
+  }
+  .btn:hover { color: var(--text-primary); border-color: var(--baseline); }
+  .btn .caret { font-size: 10px; color: var(--text-muted); }
+  .menu {
+    position: fixed; z-index: 60; min-width: 200px; background: var(--surface-1); border: 1px solid var(--gridline);
+    border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px var(--shadow);
+  }
+  .menu-item {
+    display: flex; width: 100%; gap: 8px; align-items: center; text-align: left; font: inherit; font-size: 13px;
+    color: var(--text-primary); background: none; border: 0; border-radius: 6px; padding: 6px 8px; cursor: pointer;
+  }
+  .menu-item:hover, .menu-item:focus-visible { background: var(--code-bg); outline: none; }
+  .menu-check { width: 14px; color: var(--accent); flex: none; }
+  .menu-sep { height: 1px; background: var(--gridline); margin: 4px 2px; }
+  .board-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .board {
+    flex: 1; min-height: 0; display: grid; gap: 14px; overflow-x: auto;
+    grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); grid-template-rows: minmax(0, 1fr);
+  }
+  .col { display: flex; flex-direction: column; min-height: 0; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 10px 4px 10px 10px; }
   .col-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; }
   .col-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .col-title { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); }
   .col-count { margin-left: auto; color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  .cards { display: flex; flex-direction: column; gap: 8px; min-height: 8px; }
+  .col-sort {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+    border: 0; border-radius: 6px; background: none; color: var(--text-muted); cursor: pointer; margin-right: 6px;
+  }
+  .col-sort:hover { background: var(--code-bg); color: var(--text-primary); }
+  .col-sort svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .col-sort.active { color: var(--accent); }
+  .col-sort.active::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .cards {
+    display: flex; flex-direction: column; gap: 8px; min-height: 8px; flex: 1;
+    overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--baseline) transparent;
+  }
+  .cards > * { flex: none; }
+  .show-more {
+    font: inherit; font-size: 12.5px; color: var(--text-secondary); background: none; border: 1px dashed var(--baseline);
+    border-radius: 8px; padding: 7px; cursor: pointer;
+  }
+  .show-more:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  @media (max-width: 719px) {
+    body { display: block; height: auto; }
+    .search { min-width: 0; flex: 1 1 100%; }
+    .tb-spacer { display: none; }
+    #tb-sort { flex: 1 1 100%; }
+    .view { padding: 14px 12px 40px; }
+    main, main.board-mode { display: block; overflow: visible; }
+    main.board-mode #view-board { display: block; }
+    .board-root { display: block; }
+    .board { display: flex; flex-direction: column; overflow: visible; }
+    .col { padding-right: 10px; }
+    .cards { overflow: visible; padding-right: 0; }
+  }
   .card {
     background: var(--page); border: 1px solid var(--gridline); border-radius: 8px;
     padding: 10px 12px; cursor: pointer; transition: border-color 0.1s, transform 0.06s;
   }
   .card:hover { border-color: var(--baseline); transform: translateY(-1px); }
+  .card { border-left: 3px solid var(--prio, var(--baseline)); }
+  .card .chead { display: flex; align-items: center; gap: 8px; }
   .card .cid { color: var(--text-muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .card .cicons { margin-left: auto; display: inline-flex; gap: 8px; color: var(--text-muted); font-size: 11.5px; }
+  .card .cicons span { display: inline-flex; align-items: center; gap: 3px; }
+  .card .cicons svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .board.lanes { display: block; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--baseline) transparent; padding-right: 4px; }
+  .lane-heads, .lane-grid { display: grid; grid-template-columns: repeat(var(--cols), minmax(250px, 1fr)); gap: 14px; }
+  .lane-heads { position: sticky; top: 0; z-index: 2; background: var(--page); padding-bottom: 4px; }
+  .lane-heads .col-head { padding: 6px 8px; }
+  .lane-title { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .lane-title .lane-count { color: var(--text-muted); font-weight: 400; }
+  .lane .cards { overflow: visible; padding-right: 0; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 8px; }
+  @media (max-width: 719px) { .lane-heads { display: none; } .lane-grid { grid-template-columns: 1fr; } }
+  .board.compact .card { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; }
+  .board.compact .card .chead { flex: none; min-width: 58px; }
+  .board.compact .card .cicons, .board.compact .card .cmeta { display: none; }
+  .board.compact .card .ctitle { margin: 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .board.compact .cards { gap: 5px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .card .ctitle { font-weight: 550; margin: 2px 0 6px; }
   .card .cmeta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-secondary); border: 1px solid var(--gridline); border-radius: 999px; padding: 1px 8px; background: var(--surface-1); }
@@ -112,7 +231,8 @@
 
   /* ---------- Dashboard ---------- */
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .tile { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 14px 16px; }
+  .tile { display: flex; flex-direction: column; justify-content: flex-start; text-align: left; font: inherit; color: inherit; cursor: pointer; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 14px 16px; }
+  .tile:hover { border-color: var(--baseline); }
   .tile .tlabel { color: var(--text-secondary); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
   .tile .tvalue { font-weight: 600; font-size: 30px; margin-top: 2px; letter-spacing: -0.01em; }
   .tile .tsub { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
@@ -120,6 +240,85 @@
 
   .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
   .panel { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; padding: 16px; }
+  .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--gridline); }
+  .kv:last-child { border-bottom: 0; }
+  .kv .k { color: var(--text-secondary); }
+  .kv .v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .kv .v small { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
+  .kv[role="button"] { cursor: pointer; }
+  .trow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+  .trow:hover .tname { color: var(--accent); }
+  .trow .tname { width: 96px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); }
+  .trow .tbar { flex: 1; height: 8px; border-radius: 999px; background: var(--gridline); display: flex; overflow: hidden; }
+  .trow .tbar span { display: block; height: 100%; }
+  .trow .tcount { width: 40px; flex: none; text-align: right; color: var(--text-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .panel.span2 { grid-column: span 2; }
+  @media (max-width: 900px) { .panel.span2 { grid-column: 1 / -1; } }
+  .panel h2 .hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+  .legend { display: flex; gap: 16px; margin: -4px 0 8px; color: var(--text-secondary); font-size: 12.5px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .ltable-wrap { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 10px; overflow: hidden; }
+  .ltable { width: 100%; border-collapse: collapse; }
+  .ltable th, .ltable td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--gridline); vertical-align: baseline; }
+  .ltable tbody tr:last-child td { border-bottom: 0; }
+  .ltable tbody tr { cursor: pointer; }
+  .ltable tbody tr:hover, .ltable tbody tr:focus-visible { background: var(--code-bg); outline: none; }
+  .ltable .th-sort { font: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); background: none; border: 0; cursor: pointer; padding: 0; }
+  .ltable .th-sort:hover, .ltable .th-sort.active { color: var(--text-primary); }
+  .ltable .arrow { display: inline-block; width: 14px; margin-left: 2px; color: var(--accent); }
+  .ltable .lid { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ltable .ltitle { font-weight: 550; }
+  .ltable .ltags { color: var(--text-muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .ltable .ldue, .ltable .lupd { color: var(--text-secondary); white-space: nowrap; font-size: 12.5px; }
+  .ltable .ldue.overdue { color: var(--overdue); font-weight: 600; }
+  .ltable .lempty { text-align: center; color: var(--text-muted); padding: 30px; }
+  .help { padding: 18px 20px; }
+  .help:focus { outline: none; }
+  .help h2 { font-size: 15px; margin-bottom: 10px; }
+  .help dl > div { display: flex; align-items: baseline; gap: 14px; padding: 6px 0; border-bottom: 1px solid var(--gridline); }
+  .help dl > div:last-child { border-bottom: 0; }
+  .help dt { width: 90px; flex: none; }
+  .help dd { color: var(--text-secondary); }
+  kbd { font: inherit; font-size: 11px; padding: 0 5px; border: 1px solid var(--baseline); border-radius: 4px; color: var(--text-muted); background: var(--page); }
+  #palette-btn kbd { margin-left: 2px; }
+  .palette-overlay { z-index: 80; padding-top: 12vh; }
+  .palette { width: min(600px, 100%); background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px var(--shadow); align-self: flex-start; }
+  .palette input { width: 100%; padding: 14px 16px; font: inherit; font-size: 15px; color: var(--text-primary); background: none; border: 0; border-bottom: 1px solid var(--gridline); outline: none; }
+  .palette ul { list-style: none; max-height: 340px; overflow-y: auto; padding: 6px; }
+  .palette li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  .palette li[aria-selected="true"] { background: var(--code-bg); }
+  .palette li .pid { color: var(--text-muted); font-size: 12px; flex: none; width: 58px; font-variant-numeric: tabular-nums; }
+  .palette li .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .palette li .pt mark { background: none; color: var(--accent); font-weight: 650; }
+  .palette li .psub { color: var(--text-muted); font-size: 12px; flex: none; }
+  .palette .pnone { padding: 18px; text-align: center; color: var(--text-muted); cursor: default; justify-content: center; }
+  .palette-foot { display: flex; gap: 14px; padding: 7px 14px; border-top: 1px solid var(--gridline); color: var(--text-muted); font-size: 11.5px; }
+  .tip {
+    position: fixed; z-index: 70; pointer-events: none; display: none; background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--baseline); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: 0 6px 18px var(--shadow);
+  }
+  .tip .tt { color: var(--text-secondary); margin-bottom: 3px; }
+  .tip .tr { display: flex; align-items: center; gap: 8px; }
+  .tip .tr b { margin-left: auto; padding-left: 14px; font-variant-numeric: tabular-nums; }
+  .tip .key { width: 12px; height: 3px; border-radius: 2px; flex: none; }
+  #weekly-chart { width: 100%; height: auto; display: block; }
+  #weekly-chart .grp:hover .hl, #weekly-chart .grp:focus-within .hl { opacity: 1; }
+  #weekly-chart .hl { fill: var(--code-bg); opacity: 0; }
+  #weekly-chart .hit { outline: none; }
+  #weekly-chart .hit:focus-visible { outline: 2px solid var(--accent); }
+  details.tbl { margin-top: 10px; color: var(--text-secondary); font-size: 12.5px; }
+  details.tbl summary { cursor: pointer; color: var(--text-muted); }
+  details.tbl table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  details.tbl th, details.tbl td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--gridline); }
+  details.tbl th:first-child, details.tbl td:first-child { text-align: left; }
+  .panel.wide { grid-column: 1 / -1; }
+  .clist li { flex-direction: column; gap: 2px; }
+  .clist .chead { display: flex; align-items: baseline; gap: 8px; width: 100%; }
+  .clist .cexcerpt {
+    color: var(--text-secondary); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; width: 100%;
+  }
   .panel h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); margin-bottom: 12px; }
   .chart-wrap { position: relative; }
   #prio-chart { width: 100%; height: auto; display: block; }
@@ -134,6 +333,7 @@
   .plist { list-style: none; display: flex; flex-direction: column; }
   .plist li { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--gridline); cursor: pointer; }
   .plist li:last-child { border-bottom: 0; }
+  .plist .sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; align-self: center; }
   .plist .pid { color: var(--text-muted); font-size: 11.5px; flex: none; font-variant-numeric: tabular-nums; }
   .plist .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plist .pwhen { color: var(--text-muted); font-size: 12px; flex: none; }
@@ -157,17 +357,57 @@
   .mdesc h1, .mdesc h2, .mdesc h3 { font-size: 15px; margin: 12px 0 6px; }
   .mdesc ul, .mdesc ol { margin: 0 0 8px 20px; }
   .mdesc code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .mdesc blockquote { border-left: 3px solid var(--baseline); padding-left: 10px; margin: 0 0 8px; color: var(--text-secondary); }
+  .mdesc li.task { list-style: none; margin-left: -18px; }
+  .mdesc input[type="checkbox"] { margin-right: 6px; vertical-align: -1px; }
+  .ctext p { margin: 0 0 6px; }
+  .ctext p:last-child { margin-bottom: 0; }
   .mdesc pre { background: var(--code-bg); padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 0 0 8px; }
   .mdesc pre code { background: none; padding: 0; }
+  .cmd { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cmd code {
+    flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; background: var(--code-bg); padding: 6px 10px; border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+  }
+  .cmd select {
+    font: inherit; font-size: 12.5px; color: var(--text-secondary); background: var(--surface-1);
+    border: 1px solid var(--gridline); border-radius: 6px; padding: 4px 6px;
+  }
+  .cmd .btn { flex: none; min-width: 64px; justify-content: center; }
   .comment { border-top: 1px solid var(--gridline); padding: 9px 0; }
   .comment:first-child { border-top: 0; }
   .comment .cat { color: var(--text-muted); font-size: 11.5px; margin-bottom: 2px; }
-  .comment .ctext { white-space: pre-wrap; }
-  .modal .close { float: right; border: 0; background: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; }
+  .mtools { float: right; display: flex; align-items: center; gap: 2px; color: var(--text-muted); font-size: 12px; }
+  .mtools .step { border: 0; background: none; color: var(--text-muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 7px; border-radius: 6px; }
+  .mtools .step:hover:not(:disabled) { color: var(--text-primary); background: var(--code-bg); }
+  .mtools .step:disabled { opacity: 0.35; cursor: default; }
+  .mtools .pos { font-variant-numeric: tabular-nums; margin-right: 4px; }
+  a.commit { text-decoration: none; }
+  a.commit code { color: var(--accent); }
+  a.xref { text-decoration: none; border-bottom: 1px dotted currentColor; }
+  .modal .close { border: 0; border: 0; background: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 6px; }
   .modal .close:hover { color: var(--text-primary); }
 
   .empty-state { text-align: center; color: var(--text-muted); padding: 60px 0; }
   .empty-state code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+  @media print {
+    :root[data-theme] {
+      color-scheme: light; --surface-1: #fff; --page: #fff; --text-primary: #000; --text-secondary: #333; --text-muted: #666;
+      --gridline: #ccc; --baseline: #999; --code-bg: #eee; --shadow: transparent; --accent: #1a56a0;
+    }
+    body { display: block; height: auto; }
+    header { position: static; padding: 0 0 10px; }
+    .tabs, .progress, .icon-btn, #palette-btn, .toolbar, .since, .warn, .col-sort, .show-more, .menu, .tip { display: none !important; }
+    main, main.board-mode { display: block; overflow: visible; }
+    .view { max-width: none; padding: 0; }
+    main.board-mode #view-board { display: block; max-width: none; padding: 0; }
+    .board { display: grid; grid-template-columns: repeat(4, 1fr); overflow: visible; gap: 8px; }
+    .board.lanes { display: block; }
+    .col, .cards { overflow: visible; }
+    .card, .panel, .tile { break-inside: avoid; }
+    .card { border-color: #aaa; }
+    .overlay { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -175,16 +415,28 @@
 
 <header>
   <div class="brand">hira <span class="proj" id="proj-name"></span></div>
-  <div class="tabs" role="tablist">
-    <button id="tab-board" class="active" onclick="showView('board')">Board</button>
-    <button id="tab-dash" onclick="showView('dash')">Dashboard</button>
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button id="tab-board" class="active" role="tab" aria-controls="view-board" onclick="showView('board')">Board</button>
+    <button id="tab-list" role="tab" aria-controls="view-board" onclick="showView('list')">List</button>
+    <button id="tab-dash" role="tab" aria-controls="view-dash" onclick="showView('dash')">Dashboard</button>
   </div>
+  <div class="progress" id="progress" title="" role="img"></div>
   <div class="snapshot-note" id="snapshot-note"></div>
+  <button class="btn" id="palette-btn" title="Jump to a ticket" aria-haspopup="dialog">Jump to… <kbd id="palette-kbd">Ctrl K</kbd></button>
+  <button class="icon-btn" id="help-btn" onclick="openHelp()" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-haspopup="dialog">?</button>
+  <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()"></button>
 </header>
 
+<div class="warn" id="stale-warn" role="status" hidden></div>
+
 <main>
-  <section id="view-board" class="view active"></section>
+  <section id="view-board" class="view active">
+    <div class="since" id="since-board" hidden></div>
+    <div class="toolbar" id="toolbar"></div>
+    <div class="board-root" id="board-root"></div>
+  </section>
   <section id="view-dash" class="view">
+    <div class="since" id="since-dash" hidden></div>
     <div class="tiles" id="tiles"></div>
     <div class="panels">
       <div class="panel">
@@ -202,18 +454,70 @@
         <h2>Recently updated</h2>
         <ul class="plist" id="recent-list"></ul>
       </div>
+      <div class="panel">
+        <h2>Flow</h2>
+        <div id="flow-stats"></div>
+      </div>
+      <div class="panel">
+        <h2>Progress by tag</h2>
+        <div id="tag-progress"></div>
+      </div>
+      <div class="panel">
+        <h2>Stale tickets <span class="hint">open, untouched 14+ days</span></h2>
+        <ul class="plist" id="stale-list"></ul>
+      </div>
+      <div class="panel">
+        <h2>Open tickets by tag</h2>
+        <div id="open-tags"></div>
+      </div>
+      <div class="panel span2">
+        <h2>Created vs completed, by week</h2>
+        <div class="legend" id="weekly-legend"></div>
+        <div class="chart-wrap"><svg id="weekly-chart" role="img" aria-label="Tickets created and completed per week"></svg></div>
+        <details class="tbl"><summary>View as table</summary><table id="weekly-table"></table></details>
+      </div>
+      <div class="panel wide">
+        <h2>Recent comments</h2>
+        <ul class="plist clist" id="comment-list"></ul>
+      </div>
     </div>
   </section>
 </main>
 
+<div class="overlay palette-overlay" id="help-overlay" onclick="if (event.target === this) closeHelp()">
+  <div class="palette help" role="dialog" aria-modal="true" aria-labelledby="help-title" tabindex="-1">
+    <h2 id="help-title">Keyboard shortcuts</h2>
+    <dl>
+      <div><dt><kbd>/</kbd></dt><dd>Search tickets</dd></div>
+      <div><dt><kbd>⌘</kbd> <kbd>K</kbd></dt><dd>Jump to a ticket</dd></div>
+      <div><dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next / previous ticket (in an open ticket; ← → also work)</dd></div>
+      <div><dt><kbd>esc</kbd></dt><dd>Close a ticket, menu or this panel; clears search</dd></div>
+      <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Switch tabs (when a tab has focus)</dd></div>
+      <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move within menus and the jump panel</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>Show this panel</dd></div>
+    </dl>
+  </div>
+</div>
+
+<div class="overlay palette-overlay" id="palette-overlay" onclick="if (event.target === this) closePalette()">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Jump to a ticket">
+    <input id="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list"
+      placeholder="Jump to a ticket — type an id (12), a title, or a tag" autocomplete="off" spellcheck="false">
+    <ul id="palette-list" role="listbox"></ul>
+    <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+  </div>
+</div>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
 <div class="overlay" id="overlay" onclick="if (event.target === this) closeModal()">
-  <div class="modal" id="modal"></div>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></div>
 </div>
 
 <script>
 'use strict';
 const DATA = JSON.parse(document.getElementById('hira-data').textContent);
-const { config, tickets, generatedAt } = DATA;
+const { config, tickets, generatedAt, commitUrl } = DATA;
 
 const STATUS_COLOR = {
   'todo': 'var(--status-todo)',
@@ -221,19 +525,20 @@ const STATUS_COLOR = {
   'done': 'var(--status-done)',
   'blocked': 'var(--status-blocked)',
 };
-const STATUS_LABEL = { 'todo': 'To do', 'in-progress': 'In progress', 'done': 'Done', 'blocked': 'Blocked' };
-const PRIO_CHIP = {
+const EMPTY_TEXT = { 'todo': 'Nothing queued', 'in-progress': 'Nothing in progress', 'blocked': 'Nothing blocked', 'done': 'Nothing done yet' };
+const emptyColHtml = (status) => `<div class="empty-col">${hasFilters() ? 'No matches' : EMPTY_TEXT[status] || 'Nothing here'}</div>`;
+const STATUS_LABEL = { 'todo': 'To do', 'in-progress': 'In progress', 'done': 'Done', 'blocked': 'Blocked', 'open': 'Open', 'overdue': 'Overdue' };
+const PRIO_COLOR = {
   'urgent': 'var(--chip-urgent)', 'high': 'var(--chip-high)',
   'medium': 'var(--chip-medium)', 'low': 'var(--chip-low)',
-};
-const PRIO_BAR = {
-  'low': 'var(--prio-low)', 'medium': 'var(--prio-medium)',
-  'high': 'var(--prio-high)', 'urgent': 'var(--prio-urgent)',
 };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const todayStr = new Date().toISOString().slice(0, 10);
+const todayStr = (() => {
+  const d = new Date(), pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+})();
 const isOverdue = (t) => t.due && t.due < todayStr && t.status !== 'done';
 const statusLabel = (s) => STATUS_LABEL[s] || s;
 
@@ -241,6 +546,24 @@ function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
+/** Accepts ISO timestamps and the legacy local 'YYYY-MM-DD HH:mm' comment format. */
+function parseWhen(value) {
+  if (!value) return null;
+  const d = new Date(/^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(value) ? value.replace(' ', 'T') : value);
+  return isNaN(d) ? null : d;
+}
+/** Relative time (or a custom label) wrapped in <time> whose tooltip is the exact date and time. */
+function whenHtml(value, label) {
+  const d = parseWhen(value);
+  if (!d) return esc(label ?? value ?? '');
+  const full = d.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' });
+  return `<time datetime="${d.toISOString()}" title="${esc(full)}">${esc(label ?? relTime(d.toISOString()))}</time>`;
+}
+/** Comment time as a readable local date; the tooltip has the exact moment. Unparseable values pass through. */
+function commentTimeHtml(at) {
+  const d = parseWhen(at);
+  return d ? whenHtml(at, d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) : esc(at);
 }
 function relTime(iso) {
   if (!iso) return '';
@@ -254,67 +577,643 @@ function relTime(iso) {
   return fmtDate(iso);
 }
 
-/* Minimal markdown: headings, bold, italic, inline code, fences, links, lists. */
+/** Matches [[HIRA-3]] and bare HIRA-3 (the project prefix comes from config). */
+function xrefPattern() {
+  const pfx = String(config.prefix || 'HIRA').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\[\\[(${pfx}-\\d+)\\]\\]|\\b(${pfx}-\\d+)\\b`, 'g');
+}
+
+/* Minimal markdown: headings, bold, italic, inline code, fences, links, bullet/numbered/task lists, blockquotes. */
 function md(text) {
   if (!text) return '';
   const blocks = [];
-  let src = text.replace(/```([\s\S]*?)```/g, (_, code) => {
+  const src = text.replace(/```([\s\S]*?)```/g, (_, code) => {
     blocks.push('<pre><code>' + esc(code.replace(/^\n/, '')) + '</code></pre>');
     return '\u0000' + (blocks.length - 1) + '\u0000';
   });
-  const lines = src.split('\n');
-  let html = '', inList = false, para = [];
+  let html = '', list = null, quote = [], para = [];
   const flushPara = () => { if (para.length) { html += '<p>' + para.join('<br>') + '</p>'; para = []; } };
-  const endList = () => { if (inList) { html += '</ul>'; inList = false; } };
-  for (const raw of lines) {
-    const line = inline(raw);
-    const h = /^(#{1,3}) (.*)/.exec(raw);
-    const li = /^[-*] (.*)/.exec(raw);
-    if (h) { flushPara(); endList(); html += `<h${h[1].length + 1}>${inline(h[2])}</h${h[1].length + 1}>`; }
-    else if (li) { flushPara(); if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(li[1]) + '</li>'; }
-    else if (raw.trim() === '') { flushPara(); endList(); }
-    else { endList(); para.push(line); }
+  const endList = () => { if (list) { html += `</${list}>`; list = null; } };
+  const flushQuote = () => { if (quote.length) { html += '<blockquote>' + quote.map(inline).join('<br>') + '</blockquote>'; quote = []; } };
+  const flushAll = () => { flushPara(); endList(); flushQuote(); };
+  const item = (type, inner, cls = '') => {
+    flushPara(); flushQuote();
+    if (list !== type) { endList(); html += `<${type}>`; list = type; }
+    html += `<li${cls}>${inner}</li>`;
+  };
+  for (const raw of src.split('\n')) {
+    let m;
+    if ((m = /^(#{1,3}) (.*)/.exec(raw))) { flushAll(); html += `<h${m[1].length + 1}>${inline(m[2])}</h${m[1].length + 1}>`; }
+    else if ((m = /^[-*] \[([ xX])\] (.*)/.exec(raw))) item('ul', `<input type="checkbox" disabled${m[1] === ' ' ? '' : ' checked'}> ${inline(m[2])}`, ' class="task"');
+    else if ((m = /^[-*] (.*)/.exec(raw))) item('ul', inline(m[1]));
+    else if ((m = /^\d+[.)] (.*)/.exec(raw))) item('ol', inline(m[1]));
+    else if ((m = /^>\s?(.*)/.exec(raw))) { flushPara(); endList(); quote.push(m[1]); }
+    else if (raw.trim() === '') flushAll();
+    else { endList(); flushQuote(); para.push(inline(raw)); }
   }
-  flushPara(); endList();
+  flushAll();
   return html.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
   function inline(s) {
-    return esc(s)
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Finished HTML is parked behind placeholders so later passes can't re-process it (e.g. a URL inside `code`).
+    const stash = [];
+    const hold = (h) => '\u0001' + (stash.push(h) - 1) + '\u0001';
+    const out = esc(s)
+      .replace(/`([^`]+)`/g, (_, c) => hold(`<code>${c}</code>`))
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (_, t, u) => hold(`<a href="${u}" target="_blank" rel="noopener">${t}</a>`))
+      .replace(/https?:\/\/(?:(?!&quot;|&#39;|&lt;|&gt;)\S)+/g, (u) => {
+        let trail = (/[.,;:!?]+$/.exec(u) || [''])[0];
+        let url = u.slice(0, u.length - trail.length);
+        if ((url.match(/\)/g) || []).length > (url.match(/\(/g) || []).length) { url = url.slice(0, -1); trail = ')' + trail; }
+        return hold(`<a href="${url}" target="_blank" rel="noopener">${url}</a>`) + trail;
+      })
+      .replace(xrefPattern(), (m, a, b) => {
+        const id = a || b, ref = tickets.find((x) => x.id === id);
+        return ref ? hold(`<a class="xref" href="#ticket=${id}" data-ticket="${id}" title="${esc(ref.title)}">${id}</a>`) : m;
+      })
+      // commit hashes (needs both a digit and a letter, to skip plain numbers and ordinary words)
+      .replace(/\b[0-9a-f]{7,40}\b/g, (h) => commitUrl && /\d/.test(h) && /[a-f]/.test(h)
+        ? hold(`<a class="commit" href="${commitUrl}${h}" target="_blank" rel="noopener"><code>${h.slice(0, 7)}</code></a>`) : h)
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    return out.replace(/\u0001(\d+)\u0001/g, (_, i) => stash[+i]);
   }
 }
 
+const daysUntil = (due) => Math.round((new Date(due + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
+/** 'due today' / 'due in 3d' / '2d overdue'; far-off dates fall back to the calendar date. */
+function dueLabel(t) {
+  const d = daysUntil(t.due);
+  if (t.status === 'done') return `due ${fmtDate(t.due)}`;
+  if (d < 0) return `${-d}d overdue`;
+  if (d === 0) return 'due today';
+  if (d === 1) return 'due tomorrow';
+  return d <= 14 ? `due in ${d}d` : `due ${fmtDate(t.due)}`;
+}
+const ICON_COMMENT = '<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>';
+const ICON_DESC = '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>';
+
+function cardMetaHtml(t) {
+  let out = `<span class="sr-only">Priority: ${esc(t.priority)}</span>`;
+  if (t.due) out += `<span class="due${isOverdue(t) ? ' overdue' : ''}" title="${esc(t.due)}">${esc(dueLabel(t))}</span>`;
+  for (const tag of t.tags || []) out += `<span class="chip tag" data-tag="${esc(tag)}" title="Filter by #${esc(tag)}">#${esc(tag)}</span>`;
+  return out;
+}
+function cardIconsHtml(t) {
+  let out = '';
+  if (t.description) out += `<span title="Has a description">${ICON_DESC}</span>`;
+  if (t.comments.length) out += `<span title="${t.comments.length} comment${t.comments.length === 1 ? '' : 's'}">${ICON_COMMENT}${t.comments.length}</span>`;
+  return out ? `<span class="cicons">${out}</span>` : '';
+}
+
 function chipHtml(ticket) {
-  let out = `<span class="chip"><span class="dot" style="background:${PRIO_CHIP[ticket.priority] || 'var(--chip-low)'}"></span>${esc(ticket.priority)}</span>`;
+  let out = `<span class="chip"><span class="dot" style="background:${PRIO_COLOR[ticket.priority] || 'var(--chip-low)'}"></span>${esc(ticket.priority)}</span>`;
   if (ticket.due) out += `<span class="due${isOverdue(ticket) ? ' overdue' : ''}">due ${fmtDate(ticket.due)}</span>`;
   for (const tag of ticket.tags || []) out += `<span class="chip tag">#${esc(tag)}</span>`;
   return out;
 }
 
 /* ---------- Board ---------- */
+/** Column order: config order, except Blocked sits right after In progress so it stays visible. */
+function displayStatuses() {
+  const order = config.statuses.filter((s) => s !== 'blocked');
+  if (!config.statuses.includes('blocked')) return order;
+  const at = order.indexOf('in-progress');
+  order.splice(at === -1 ? order.length : at + 1, 0, 'blocked');
+  return order;
+}
+/* ---------- Preferences (localStorage; every key is optional) ---------- */
+const loadPref = (key, fallback) => {
+  try { const v = localStorage.getItem('hira-' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
+};
+const savePref = (key, value) => {
+  try { localStorage.setItem('hira-' + key, JSON.stringify(value)); } catch { /* not persisted */ }
+};
+
+/* ---------- Sorting ---------- */
+const ticketNo = (t) => parseInt(String(t.id).split('-').pop(), 10) || 0;
+const prioRank = (t) => config.priorities.indexOf(t.priority);
+const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999');
+const SORTS = {
+  priority: { label: 'Priority', cmp: (a, b) => prioRank(b) - prioRank(a) || byDue(a, b) || ticketNo(a) - ticketNo(b) },
+  due: { label: 'Due date', cmp: (a, b) => byDue(a, b) || prioRank(b) - prioRank(a) || ticketNo(a) - ticketNo(b) },
+  updated: { label: 'Recently updated', cmp: (a, b) => (b.updated || '').localeCompare(a.updated || '') || ticketNo(a) - ticketNo(b) },
+  newest: { label: 'Newest first', cmp: (a, b) => (b.created || '').localeCompare(a.created || '') || ticketNo(b) - ticketNo(a) },
+  id: { label: 'Ticket ID', cmp: (a, b) => ticketNo(a) - ticketNo(b) },
+};
+const DEFAULT_SORT = 'priority';
+const sortPrefs = (() => {
+  const p = loadPref('sort', {});
+  const cols = {};
+  for (const [status, key] of Object.entries(p.cols || {})) if (SORTS[key]) cols[status] = key;
+  return { board: SORTS[p.board] ? p.board : DEFAULT_SORT, cols };
+})();
+const sortFor = (status) => sortPrefs.cols[status] || sortPrefs.board;
+function setSort(status, key) {
+  if (status === null) sortPrefs.board = key;
+  else if (key === null) delete sortPrefs.cols[status];
+  else sortPrefs.cols[status] = key;
+  savePref('sort', sortPrefs);
+  renderToolbar();
+  renderBoard();
+}
+
+/* ---------- Popover menu ---------- */
+let menuEl = null, menuAnchor = null;
+function closeMenu() { if (menuEl) menuEl.remove(); menuEl = menuAnchor = null; }
+/** items: [{ label, checked, onPick, keepOpen }] or { sep: true }. A keepOpen item's onPick returns its new checked state. */
+function openMenu(anchor, items) {
+  if (menuAnchor === anchor) return closeMenu();
+  closeMenu();
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  menuEl.setAttribute('role', 'menu');
+  for (const it of items) {
+    if (it.sep) { menuEl.insertAdjacentHTML('beforeend', '<div class="menu-sep"></div>'); continue; }
+    const b = document.createElement('button');
+    b.className = 'menu-item';
+    b.setAttribute('role', 'menuitem');
+    b.innerHTML = `<span class="menu-check">${it.checked ? '✓' : ''}</span>${esc(it.label)}`;
+    b.onclick = () => {
+      if (!it.keepOpen) { closeMenu(); return it.onPick(); }
+      b.querySelector('.menu-check').textContent = it.onPick() ? '✓' : '';
+    };
+    menuEl.appendChild(b);
+  }
+  document.body.appendChild(menuEl);
+  menuAnchor = anchor;
+  const r = anchor.getBoundingClientRect();
+  menuEl.style.top = r.bottom + 4 + 'px';
+  menuEl.style.left = Math.max(8, Math.min(r.right - menuEl.offsetWidth, innerWidth - menuEl.offsetWidth - 8)) + 'px';
+  menuEl.firstElementChild?.focus();
+}
+document.addEventListener('mousedown', (e) => {
+  if (menuEl && !menuEl.contains(e.target) && !(menuAnchor && menuAnchor.contains(e.target))) closeMenu();
+});
+let lastWidth = innerWidth;
+window.addEventListener('resize', () => {
+  // mobile URL-bar show/hide fires resize with an unchanged width; keep the menu then
+  if (innerWidth !== lastWidth) { lastWidth = innerWidth; closeMenu(); }
+});
+
+const SORT_ICON = '<svg viewBox="0 0 24 24"><path d="M8 4v16M4 8l4-4 4 4M16 20V4M12 16l4 4 4-4"/></svg>';
+
+const SEARCH_ICON = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+
+/* ---------- Filtering (search / priority / tag; state lives in the URL hash) ---------- */
+const hasFilters = () => !!(route.q || route.p || route.tag || route.s);
+function ticketMatches(t) {
+  if (route.p && t.priority !== route.p) return false;
+  if (route.s === 'open' ? t.status === 'done' : route.s === 'overdue' ? !isOverdue(t) : route.s && t.status !== route.s) return false;
+  if (route.tag && !(t.tags || []).includes(route.tag)) return false;
+  if (route.q) {
+    const hay = [t.id, t.title, t.description, ...(t.tags || [])].join(' ').toLowerCase();
+    if (!route.q.toLowerCase().split(/\s+/).filter(Boolean).every((term) => hay.includes(term))) return false;
+  }
+  return true;
+}
+const visibleTickets = () => tickets.filter(ticketMatches);
+const allTags = () => {
+  const counts = {};
+  for (const t of tickets) for (const tag of t.tags || []) counts[tag] = (counts[tag] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+};
+
+function renderToolbar() {
+  const tb = document.getElementById('toolbar');
+  if (!tb.firstElementChild) {
+    tb.innerHTML = `<label class="search">${SEARCH_ICON}<input id="search" type="search" placeholder="Search tickets…  ( / )"
+        aria-label="Search tickets" autocomplete="off" spellcheck="false"></label>
+      <span class="tb-group" id="tb-filters"></span><div class="tb-spacer"></div><span class="tb-count" id="tb-count"></span>
+      <span id="tb-sort"></span>`;
+  }
+  const input = document.getElementById('search');
+  if (document.activeElement !== input) input.value = route.q;
+  const caret = ' <span class="caret">▾</span>';
+  document.getElementById('tb-filters').innerHTML =
+    `<button class="btn${route.s ? ' active' : ''}" id="status-filter-btn" aria-haspopup="menu">${route.s ? 'Status: ' + esc(statusLabel(route.s)) : 'Status'}${caret}</button>
+     <button class="btn${route.p ? ' active' : ''}" id="prio-filter-btn" aria-haspopup="menu">${route.p ? 'Priority: ' + esc(route.p) : 'Priority'}${caret}</button>
+     <button class="btn${route.tag ? ' active' : ''}" id="tag-filter-btn" aria-haspopup="menu">${route.tag ? 'Tag: #' + esc(route.tag) : 'Tag'}${caret}</button>
+     ${hasFilters() ? '<button class="btn" id="clear-filters">Clear</button>' : ''}`;
+  document.getElementById('tb-count').textContent = hasFilters() ? `${visibleTickets().length} of ${tickets.length}` : '';
+  const boardOnly = route.view === 'list' ? '' : `<button class="btn${groupBy !== 'none' ? ' active' : ''}" id="group-btn" aria-haspopup="menu">Group: ${esc(GROUPS[groupBy].replace(' (first tag)', ''))} <span class="caret">▾</span></button>
+     <button class="btn${compact ? ' active' : ''}" id="density-btn" aria-pressed="${compact}" title="Compact cards: just the id and title">Compact</button>
+     <button class="btn" id="columns-btn" aria-haspopup="menu">${columnsButtonHtml()}</button>
+     <button class="btn" id="sort-btn" aria-haspopup="menu">Sort: ${esc(SORTS[sortPrefs.board].label)}${caret}</button>`;
+  document.getElementById('tb-sort').innerHTML =
+    `<button class="btn" id="copy-md-btn" title="Copy the tickets in this view as a markdown table">Copy as table</button>` + boardOnly;
+}
+function statusFilterMenu(anchor) {
+  openMenu(anchor, [
+    { label: 'Any status', checked: !route.s, onPick: () => nav({ s: '' }, { replace: true }) },
+    { sep: true },
+    ...STATUS_FILTERS().map((s) => ({ label: statusLabel(s), checked: route.s === s, onPick: () => nav({ s }, { replace: true }) })),
+  ]);
+}
+function priorityFilterMenu(anchor) {
+  openMenu(anchor, [
+    { label: 'Any priority', checked: !route.p, onPick: () => nav({ p: '' }, { replace: true }) },
+    { sep: true },
+    ...[...config.priorities].reverse().map((p) => ({ label: p, checked: route.p === p, onPick: () => nav({ p }, { replace: true }) })),
+  ]);
+}
+function tagFilterMenu(anchor) {
+  const tags = allTags();
+  if (!tags.length) return;
+  openMenu(anchor, [
+    { label: 'Any tag', checked: !route.tag, onPick: () => nav({ tag: '' }, { replace: true }) },
+    { sep: true },
+    ...tags.map(([tag, n]) => ({ label: `#${tag} (${n})`, checked: route.tag === tag, onPick: () => nav({ tag }, { replace: true }) })),
+  ]);
+}
+function boardSortMenu(anchor) {
+  const items = Object.entries(SORTS).map(([key, v]) => ({
+    label: v.label, checked: key === sortPrefs.board, onPick: () => setSort(null, key),
+  }));
+  if (Object.keys(sortPrefs.cols).length) {
+    items.push({ sep: true }, {
+      label: 'Reset column overrides',
+      onPick: () => { sortPrefs.cols = {}; savePref('sort', sortPrefs); renderBoard(); },
+    });
+  }
+  openMenu(anchor, items);
+}
+function columnSortMenu(anchor, status) {
+  const own = sortPrefs.cols[status];
+  const items = [{ label: `Same as board (${SORTS[sortPrefs.board].label})`, checked: !own, onPick: () => setSort(status, null) }, { sep: true }];
+  for (const [key, v] of Object.entries(SORTS)) items.push({ label: v.label, checked: own === key, onPick: () => setSort(status, key) });
+  openMenu(anchor, items);
+}
+document.getElementById('view-board').addEventListener('click', (e) => {
+  const sortBtn = e.target.closest('#sort-btn');
+  if (sortBtn) return boardSortMenu(sortBtn);
+  const statusBtn = e.target.closest('#status-filter-btn');
+  if (statusBtn) return statusFilterMenu(statusBtn);
+  const groupBtn = e.target.closest('#group-btn');
+  if (groupBtn) return groupMenu(groupBtn);
+  const copyBtn = e.target.closest('#copy-md-btn');
+  if (copyBtn) return copyView(copyBtn);
+  const densityBtn = e.target.closest('#density-btn');
+  if (densityBtn) return toggleDensity(densityBtn);
+  const colsBtn = e.target.closest('#columns-btn');
+  if (colsBtn) return columnsMenu(colsBtn);
+  const prioBtn = e.target.closest('#prio-filter-btn');
+  if (prioBtn) return priorityFilterMenu(prioBtn);
+  const tagBtn = e.target.closest('#tag-filter-btn');
+  if (tagBtn) return tagFilterMenu(tagBtn);
+  if (e.target.closest('#clear-filters')) return nav({ q: '', p: '', tag: '', s: '' }, { replace: true });
+  const colBtn = e.target.closest('.col-sort');
+  if (colBtn) return columnSortMenu(colBtn, colBtn.dataset.status);
+  const more = e.target.closest('.show-more');
+  if (more) {
+    const key = more.dataset.key;
+    const scroller = more.closest('.board.lanes') || more.parentElement; // lanes scroll as a whole; columns scroll per list
+    const scroll = scroller.scrollTop;
+    if (expandedCols.has(key)) expandedCols.delete(key); else expandedCols.add(key);
+    renderBoard();
+    const again = [...document.querySelectorAll('.show-more')].find((b) => b.dataset.key === key);
+    const target = document.querySelector('.board.lanes') || (again && again.parentElement);
+    if (target) target.scrollTop = scroll;
+  }
+});
+
+function badgeHtml(t) {
+  const kind = changeKind(t);
+  return kind ? `<span class="badge${kind === 'updated' ? ' upd' : ''}" title="${kind === 'new' ? 'Created' : 'Changed'} since you were last here">${kind === 'new' ? 'new' : 'updated'}</span>` : '';
+}
+function cardHtml(t) {
+  return `<div class="card" role="button" tabindex="0" data-id="${esc(t.id)}" style="--prio:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}" onclick="openModal('${esc(t.id)}')">
+    <div class="chead"><span class="cid">${esc(t.id)}</span>${badgeHtml(t)}${cardIconsHtml(t)}</div>
+    <div class="ctitle">${esc(t.title)}</div>
+    <div class="cmeta">${cardMetaHtml(t)}</div></div>`;
+}
+
+/** Applies COLLAPSE_LIMIT to one column (or one lane cell): keeps the most recently updated tickets until expanded. */
+function collapseItems(all, status, key) {
+  const limit = COLLAPSE_LIMIT[status];
+  const collapsed = !!limit && all.length > limit && !expandedCols.has(key);
+  let items = all;
+  if (collapsed) {
+    const recent = new Set([...all].sort(SORTS.updated.cmp).slice(0, limit).map((t) => t.id));
+    items = all.filter((t) => recent.has(t.id));
+  }
+  const toggle = limit && all.length > limit
+    ? `<button class="show-more" data-key="${esc(key)}">${collapsed ? `Show ${all.length - limit} more` : 'Show fewer'}</button>` : '';
+  return { items, toggle };
+}
+
+/* ---------- Swimlanes ---------- */
+const GROUPS = { none: 'None', priority: 'Priority', tag: 'Tag (first tag)' };
+let groupBy = GROUPS[loadPref('group', 'none')] ? loadPref('group', 'none') : 'none';
+function groupMenu(anchor) {
+  openMenu(anchor, Object.entries(GROUPS).map(([key, label]) => ({
+    label, checked: groupBy === key,
+    onPick: () => { groupBy = key; savePref('group', key); renderToolbar(); renderBoard(); },
+  })));
+}
+/** Lanes in display order: [{ label, color?, tickets }]; empty lanes are dropped. A ticket lives in one lane (its first tag). */
+function lanesFor(list) {
+  let lanes;
+  if (groupBy === 'priority') {
+    lanes = [...config.priorities].reverse().map((p) => ({ label: p, color: PRIO_COLOR[p], tickets: list.filter((t) => t.priority === p) }));
+  } else {
+    const byTag = {};
+    for (const t of list) (byTag[(t.tags || [])[0] || ''] ||= []).push(t);
+    lanes = Object.entries(byTag)
+      .sort((a, b) => (a[0] === '') - (b[0] === '') || b[1].length - a[1].length || a[0].localeCompare(b[0]))
+      .map(([tag, ts]) => ({ label: tag ? '#' + tag : 'No tag', tickets: ts }));
+  }
+  return lanes.filter((l) => l.tickets.length);
+}
+function lanesHtml(list) {
+  const statuses = visibleStatuses(), cols = `style="--cols:${statuses.length}"`;
+  const heads = statuses.map((status) => `<div class="col-head">
+      <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
+      <span class="col-title">${esc(statusLabel(status))}</span>
+      <span class="col-count">${list.filter((t) => t.status === status).length}</span></div>`).join('');
+  const lanes = lanesFor(list).map((lane) => `<section class="lane"><h3 class="lane-title">
+      ${lane.color ? `<span class="col-dot" style="background:${lane.color}"></span>` : ''}${esc(lane.label)}<span class="lane-count">${lane.tickets.length}</span></h3>
+      <div class="lane-grid" ${cols}>${statuses.map((status) => {
+        const all = lane.tickets.filter((t) => t.status === status).sort(SORTS[sortFor(status)].cmp);
+        const { items, toggle } = collapseItems(all, status, `${lane.label}|${status}`);
+        return `<div class="cards">${items.map(cardHtml).join('') || emptyColHtml(status)}${toggle}</div>`;
+      }).join('')}</div></section>`).join('');
+  return `<div class="board lanes${compact ? ' compact' : ''}"><div class="lane-heads" ${cols}>${heads}</div>${
+    lanes || '<div class="empty-state">No tickets match the filters.</div>'}</div>`;
+}
+
+/** Columns that collapse to their N most recently updated tickets until expanded (per page view). */
+const COLLAPSE_LIMIT = { done: 5 };
+const expandedCols = new Set();
+
+// Capture phase: a tag chip inside a card filters instead of opening the ticket.
+document.getElementById('view-board').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip.tag');
+  if (!chip || !chip.closest('.card')) return;
+  e.stopPropagation();
+  nav({ tag: chip.dataset.tag }, { replace: true });
+}, true);
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'search') nav({ q: e.target.value.trim() }, { replace: true });
+});
+
+/* ---------- List view ---------- */
+const LIST_COLUMNS = [
+  { key: 'id', label: 'ID', cmp: (a, b) => ticketNo(a) - ticketNo(b) },
+  { key: 'title', label: 'Title', cmp: (a, b) => a.title.localeCompare(b.title) },
+  { key: 'status', label: 'Status', cmp: (a, b) => displayStatuses().indexOf(a.status) - displayStatuses().indexOf(b.status) },
+  { key: 'priority', label: 'Priority', cmp: (a, b) => prioRank(a) - prioRank(b) },
+  { key: 'due', label: 'Due', cmp: (a, b) => (a.due || '').localeCompare(b.due || ''), emptyLast: (t) => !t.due },
+  { key: 'updated', label: 'Updated', cmp: (a, b) => (a.updated || '').localeCompare(b.updated || '') },
+];
+let listSort = (() => {
+  const p = loadPref('list-sort', {});
+  return { key: LIST_COLUMNS.some((c) => c.key === p.key) ? p.key : 'priority', dir: p.dir === 'asc' ? 'asc' : 'desc' };
+})();
+function sortedListRows() {
+  const col = LIST_COLUMNS.find((c) => c.key === listSort.key), sign = listSort.dir === 'asc' ? 1 : -1;
+  return visibleTickets().sort((a, b) => {
+    if (col.emptyLast && col.emptyLast(a) !== col.emptyLast(b)) return col.emptyLast(a) ? 1 : -1; // blanks stay at the bottom either way
+    return sign * col.cmp(a, b) || ticketNo(a) - ticketNo(b);
+  });
+}
+function renderList() {
+  const rows = sortedListRows();
+  const head = LIST_COLUMNS.map((c) => {
+    const active = c.key === listSort.key;
+    return `<th scope="col" aria-sort="${active ? (listSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
+      <button class="th-sort${active ? ' active' : ''}" data-key="${c.key}">${c.label}<span class="arrow">${active ? (listSort.dir === 'asc' ? '↑' : '↓') : ''}</span></button></th>`;
+  }).join('');
+  const body = rows.map((t) => `<tr tabindex="0" data-id="${esc(t.id)}" onclick="openModal('${esc(t.id)}')">
+      <td class="lid">${esc(t.id)} ${badgeHtml(t)}</td><td class="ltitle">${esc(t.title)}${t.tags.length ? ` <span class="ltags">${t.tags.map((x) => '#' + esc(x)).join(' ')}</span>` : ''}</td>
+      <td><span class="chip"><span class="dot" style="background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span></td>
+      <td><span class="chip"><span class="dot" style="background:${PRIO_COLOR[t.priority] || 'var(--chip-low)'}"></span>${esc(t.priority)}</span></td>
+      <td class="ldue${isOverdue(t) ? ' overdue' : ''}">${t.due ? esc(dueLabel(t)) : ''}</td>
+      <td class="lupd">${whenHtml(t.updated)}</td></tr>`).join('');
+  document.getElementById('board-root').innerHTML = `<div class="ltable-wrap"><table class="ltable"><thead><tr>${head}</tr></thead>
+    <tbody>${body || '<tr><td colspan="6" class="lempty">No tickets match the filters.</td></tr>'}</tbody></table></div>`;
+}
+document.getElementById('view-board').addEventListener('click', (e) => {
+  const th = e.target.closest('.th-sort');
+  if (!th) return;
+  listSort = th.dataset.key === listSort.key
+    ? { key: listSort.key, dir: listSort.dir === 'asc' ? 'desc' : 'asc' }
+    : { key: th.dataset.key, dir: ['id', 'title', 'due', 'status'].includes(th.dataset.key) ? 'asc' : 'desc' };
+  savePref('list-sort', listSort);
+  renderList();
+  document.querySelector(`.th-sort[data-key="${listSort.key}"]`).focus();
+});
+
+/* ---------- Since your last visit ----------
+ * localStorage keeps when the board was last open; sessionStorage pins that moment for this tab, so reloading
+ * to pick up fresh data keeps showing what changed instead of wiping the markers. */
+let since = (() => {
+  try {
+    const kept = sessionStorage.getItem('hira-since');
+    if (kept !== null) return kept ? +kept : null;
+    const prev = localStorage.getItem('hira-last-visit');
+    sessionStorage.setItem('hira-since', prev || '');
+    return prev ? +prev : null;
+  } catch { return null; }
+})();
+function stampVisit() { try { localStorage.setItem('hira-last-visit', String(Date.now())); } catch { /* not persisted */ } }
+window.addEventListener('pagehide', stampVisit);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') stampVisit(); });
+const stampOf = (v) => { const d = parseWhen(v); return d ? d.getTime() : 0; };
+/** 'new' (created since), 'updated' (changed since), or null. */
+function changeKind(t) {
+  if (since == null) return null;
+  if (stampOf(t.created) > since) return 'new';
+  return stampOf(t.updated) > since ? 'updated' : null;
+}
+function renderSince() {
+  let html = '';
+  if (since != null) {
+    const nNew = tickets.filter((t) => changeKind(t) === 'new').length;
+    const nUpd = tickets.filter((t) => changeKind(t) === 'updated').length;
+    const nDone = tickets.filter((t) => t.status === 'done' && stampOf(t.updated) > since).length;
+    const nComments = tickets.reduce((n, t) => n + t.comments.filter((c) => stampOf(c.at) > since).length, 0);
+    const parts = [[nNew, 'new'], [nUpd, 'updated'], [nDone, 'completed'], [nComments, nComments === 1 ? 'comment' : 'comments']]
+      .filter(([n]) => n).map(([n, label]) => `<b>${n}</b> ${label}`);
+    if (parts.length) {
+      html = `<span>Since you were last here (${whenHtml(new Date(since).toISOString())}):</span> ${parts.join(' · ')}
+        <button class="btn" id="mark-seen">Mark all seen</button>`;
+    }
+  }
+  for (const id of ['since-board', 'since-dash']) {
+    const el = document.getElementById(id);
+    el.innerHTML = html;
+    el.hidden = !html;
+  }
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#mark-seen')) return;
+  since = Date.now();
+  try { sessionStorage.setItem('hira-since', String(since)); } catch { /* ignore */ }
+  stampVisit();
+  renderSince();
+  renderBoard();
+});
+
+/* ---------- Quick jump (Cmd/Ctrl+K) ---------- */
+let paletteHits = [], paletteIndex = 0;
+const isMac = /mac|iphone|ipad/i.test(navigator.platform || '');
+function paletteSearch(raw) {
+  const q = raw.trim().toLowerCase();
+  if (!q) return [...tickets].sort(SORTS.updated.cmp).slice(0, 8);
+  const terms = q.split(/\s+/);
+  return tickets.map((t) => {
+    const id = t.id.toLowerCase(), title = t.title.toLowerCase();
+    const hay = [id, title, ...(t.tags || []), (t.description || '').toLowerCase()].join(' ');
+    if (!terms.every((term) => hay.includes(term))) return null;
+    let score = 0;
+    if (id === q || String(ticketNo(t)) === q) score += 100;
+    else if (id.startsWith(q)) score += 60;
+    else if (id.includes(q)) score += 30;
+    for (const term of terms) score += title.includes(term) ? (title.startsWith(term) || title.includes(' ' + term) ? 15 : 10) : 3;
+    return { t, score };
+  }).filter(Boolean).sort((a, b) => b.score - a.score || ticketNo(a.t) - ticketNo(b.t)).slice(0, 8).map((r) => r.t);
+}
+function highlight(text, terms) {
+  const re = terms.length ? new RegExp('(' + terms.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'ig') : null;
+  return re ? text.split(re).map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part))).join('') : esc(text);
+}
+function renderPalette() {
+  const input = document.getElementById('palette-input');
+  const terms = input.value.trim().split(/\s+/).filter(Boolean);
+  paletteHits = paletteSearch(input.value);
+  paletteIndex = Math.min(paletteIndex, Math.max(paletteHits.length - 1, 0));
+  document.getElementById('palette-list').innerHTML = paletteHits.length
+    ? paletteHits.map((t, i) => `<li role="option" id="pal-${i}" data-i="${i}" aria-selected="${i === paletteIndex}">
+        <span class="pid">${esc(t.id)}</span><span class="pt">${highlight(t.title, terms)}</span>
+        <span class="psub"><span class="sdot" style="display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span></li>`).join('')
+    : '<li class="pnone">No matching tickets</li>';
+  input.setAttribute('aria-activedescendant', paletteHits.length ? 'pal-' + paletteIndex : '');
+  const sel = document.querySelector('#palette-list li[aria-selected="true"]');
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+function openPalette() {
+  closeMenu();
+  const overlay = document.getElementById('palette-overlay');
+  if (overlay.classList.contains('open')) return;
+  paletteReturn = document.activeElement;
+  overlay.classList.add('open');
+  const input = document.getElementById('palette-input');
+  input.value = '';
+  paletteIndex = 0;
+  renderPalette();
+  input.focus();
+}
+let paletteReturn = null;
+function closePalette() {
+  document.getElementById('palette-overlay').classList.remove('open');
+  if (paletteReturn && paletteReturn.isConnected) paletteReturn.focus();
+  paletteReturn = null;
+}
+function pickPalette(i) {
+  const t = paletteHits[i];
+  if (!t) return;
+  closePalette();
+  openModal(t.id);
+}
+document.getElementById('palette-input').addEventListener('input', () => { paletteIndex = 0; renderPalette(); });
+document.getElementById('palette-list').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-i]');
+  if (li) pickPalette(+li.dataset.i);
+});
+document.getElementById('palette-btn').addEventListener('click', openPalette);
+document.getElementById('palette-kbd').textContent = isMac ? '⌘K' : 'Ctrl K';
+
+/* ---------- Shortcuts help (?) ---------- */
+let helpReturn = null;
+function openHelp() {
+  closeMenu();
+  const overlay = document.getElementById('help-overlay');
+  if (overlay.classList.contains('open')) return;
+  helpReturn = document.activeElement;
+  overlay.classList.add('open');
+  overlay.querySelector('.help').focus();
+}
+function closeHelp() {
+  document.getElementById('help-overlay').classList.remove('open');
+  if (helpReturn && helpReturn.isConnected) helpReturn.focus();
+  helpReturn = null;
+}
+
+/* ---------- Copy as markdown ---------- */
+/** The tickets in the current view (filters applied, in board or list order) as a GitHub-flavoured markdown table. */
+function viewAsMarkdown() {
+  const rows = route.view === 'list' ? sortedListRows() : boardOrder(visibleTickets());
+  const cell = (v) => String(v ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+  const lines = ['| ID | Title | Status | Priority | Due |', '| --- | --- | --- | --- | --- |'];
+  for (const t of rows) lines.push(`| ${cell(t.id)} | ${cell(t.title)} | ${cell(statusLabel(t.status))} | ${cell(t.priority)} | ${cell(t.due)} |`);
+  return { text: lines.join('\n'), count: rows.length };
+}
+async function copyView(btn) {
+  const { text, count } = viewAsMarkdown();
+  const label = btn.textContent;
+  btn.textContent = (await copyText(text)) ? `Copied ${count} ✓` : 'Copy failed';
+  setTimeout(() => { btn.textContent = label; }, 1600);
+}
+
+/* ---------- Card density ---------- */
+let compact = loadPref('density', 'comfortable') === 'compact';
+function toggleDensity(btn) {
+  compact = !compact;
+  savePref('density', compact ? 'compact' : 'comfortable');
+  btn.classList.toggle('active', compact);
+  btn.setAttribute('aria-pressed', String(compact));
+  renderBoard();
+}
+
+/* ---------- Column visibility ---------- */
+const hiddenCols = new Set(loadPref('hidden-cols', []));
+const visibleStatuses = () => displayStatuses().filter((s) => !hiddenCols.has(s));
+function columnsButtonHtml() {
+  const all = displayStatuses().length, shown = visibleStatuses().length;
+  return `Columns${shown < all ? ` <span class="caret">${shown}/${all}</span>` : ''} <span class="caret">▾</span>`;
+}
+function columnsMenu(anchor) {
+  openMenu(anchor, displayStatuses().map((status) => ({
+    label: statusLabel(status),
+    checked: !hiddenCols.has(status),
+    keepOpen: true,
+    onPick: () => {
+      if (!hiddenCols.has(status)) {
+        if (visibleStatuses().length <= 1) return true; // keep at least one column on screen
+        hiddenCols.add(status);
+      } else hiddenCols.delete(status);
+      savePref('hidden-cols', [...hiddenCols]);
+      anchor.innerHTML = columnsButtonHtml();
+      renderBoard();
+      return !hiddenCols.has(status);
+    },
+  })));
+}
+
 function renderBoard() {
-  const root = document.getElementById('view-board');
+  if (route.view === 'list') return renderList();
+  const root = document.getElementById('board-root');
   if (tickets.length === 0) {
-    root.innerHTML = `<div class="empty-state">No tickets yet.<br>Create one with <code>hira add "My first task"</code>, then rerun <code>hira board</code>.</div>`;
+    root.innerHTML = `<div class="empty-state">No tickets yet.<br>Create one with <code>hira add "My first task"</code>; the board updates automatically.</div>`;
     return;
   }
-  let html = '<div class="board">';
-  for (const status of config.statuses) {
-    const items = tickets.filter((t) => t.status === status);
+  const visible = visibleTickets();
+  if (groupBy !== 'none') { root.innerHTML = lanesHtml(visible); return; }
+  let html = `<div class="board${compact ? ' compact' : ''}">`;
+  for (const status of visibleStatuses()) {
+    const sortKey = sortFor(status);
+    const all = visible.filter((t) => t.status === status).sort(SORTS[sortKey].cmp);
+    const { items, toggle } = collapseItems(all, status, status);
+    const overridden = !!sortPrefs.cols[status];
     html += `<div class="col"><div class="col-head">
       <span class="col-dot" style="background:${STATUS_COLOR[status] || 'var(--status-todo)'}"></span>
       <span class="col-title">${esc(statusLabel(status))}</span>
-      <span class="col-count">${items.length}</span></div><div class="cards">`;
-    if (items.length === 0) html += '<div class="empty-col">—</div>';
-    for (const t of items) {
-      html += `<div class="card" onclick="openModal('${esc(t.id)}')">
-        <div class="cid">${esc(t.id)}</div>
-        <div class="ctitle">${esc(t.title)}</div>
-        <div class="cmeta">${chipHtml(t)}</div></div>`;
-    }
-    html += '</div></div>';
+      <span class="col-count">${all.length}</span>
+      <button class="col-sort${overridden ? ' active' : ''}" data-status="${esc(status)}" aria-haspopup="menu"
+        title="Sorted by ${esc(SORTS[sortKey].label)}${overridden ? ' (column override)' : ''}" aria-label="Sort ${esc(statusLabel(status))} column">${SORT_ICON}</button></div><div class="cards">`;
+    if (items.length === 0) html += emptyColHtml(status);
+    for (const t of items) html += cardHtml(t);
+    html += toggle + '</div></div>';
   }
   root.innerHTML = html + '</div>';
 }
@@ -325,24 +1224,30 @@ function renderDash() {
   const count = (s) => tickets.filter((t) => t.status === s).length;
   const overdue = tickets.filter(isOverdue);
   const tiles = [
-    { label: 'Open tickets', value: open.length, sub: tickets.length + ' total' },
-    { label: 'In progress', value: count('in-progress'), dot: STATUS_COLOR['in-progress'] },
-    { label: 'Blocked', value: count('blocked'), dot: STATUS_COLOR['blocked'] },
-    { label: 'Done', value: count('done'), dot: STATUS_COLOR['done'] },
-    { label: 'Overdue', value: overdue.length, dot: overdue.length ? 'var(--overdue)' : 'var(--status-todo)' },
+    { label: 'Open tickets', value: open.length, sub: tickets.length + ' total', filter: 'open' },
+    { label: 'In progress', value: count('in-progress'), dot: STATUS_COLOR['in-progress'], filter: 'in-progress' },
+    { label: 'Blocked', value: count('blocked'), dot: STATUS_COLOR['blocked'], filter: 'blocked' },
+    { label: 'Done', value: count('done'), dot: STATUS_COLOR['done'], filter: 'done' },
+    { label: 'Overdue', value: overdue.length, dot: overdue.length ? 'var(--overdue)' : 'var(--status-todo)', filter: 'overdue' },
   ];
   document.getElementById('tiles').innerHTML = tiles.map((t) => `
-    <div class="tile"><div class="tlabel">${t.dot ? `<span class="dot" style="background:${t.dot}"></span>` : ''}${t.label}</div>
-    <div class="tvalue">${t.value}</div>${t.sub ? `<div class="tsub">${t.sub}</div>` : ''}</div>`).join('');
+    <button class="tile" data-filter="${t.filter}" title="Show on the board"><div class="tlabel">${t.dot ? `<span class="dot" style="background:${t.dot}"></span>` : ''}${t.label}</div>
+    <div class="tvalue">${t.value}</div>${t.sub ? `<div class="tsub">${t.sub}</div>` : ''}</button>`).join('');
 
   renderPrioChart(open);
+  renderFlow();
+  renderTagProgress();
+  renderStale();
+  renderOpenTags();
+  renderWeekly();
+  renderRecentComments();
 
   const dueSoon = tickets
     .filter((t) => t.due && t.status !== 'done')
     .sort((a, b) => a.due.localeCompare(b.due))
     .slice(0, 8);
   document.getElementById('due-list').innerHTML = dueSoon.length
-    ? dueSoon.map((t) => `<li onclick="openModal('${esc(t.id)}')">
+    ? dueSoon.map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
         <span class="pwhen${isOverdue(t) ? ' overdue' : ''}">${isOverdue(t) ? 'overdue · ' : ''}${fmtDate(t.due)}</span></li>`).join('')
     : '<li class="none">Nothing with a due date.</li>';
@@ -352,10 +1257,171 @@ function renderDash() {
     .sort((a, b) => b.updated.localeCompare(a.updated))
     .slice(0, 8);
   document.getElementById('recent-list').innerHTML = recent.length
-    ? recent.map((t) => `<li onclick="openModal('${esc(t.id)}')">
+    ? recent.map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
         <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
-        <span class="pwhen">${relTime(t.updated)}</span></li>`).join('')
+        <span class="pwhen">${whenHtml(t.updated)}</span></li>`).join('')
     : '<li class="none">No activity yet.</li>';
+}
+
+/* ---------- Shared chart tooltip ---------- */
+const tipEl = document.getElementById('tip');
+function showTip(html, x, y) {
+  tipEl.innerHTML = html;
+  tipEl.style.display = 'block';
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = Math.max(8, Math.min(x + 14, innerWidth - w - 8)) + 'px';
+  tipEl.style.top = Math.max(8, Math.min(y - h - 10, innerHeight - h - 8)) + 'px';
+}
+const hideTip = () => { tipEl.style.display = 'none'; };
+
+/** Bar with a 4px rounded data end, anchored on the baseline. */
+function roundedBar(x, w, top, base) {
+  const r = Math.min(4, (base - top) / 2, w / 2);
+  return `M${x},${base} L${x},${top + r} Q${x},${top} ${x + r},${top} L${x + w - r},${top} Q${x + w},${top} ${x + w},${top + r} L${x + w},${base} Z`;
+}
+
+/** Stale = open and not updated for 14+ days. */
+function renderStale() {
+  const cutoff = Date.now() - 14 * 86400000;
+  const stale = tickets
+    .filter((t) => t.status !== 'done' && parseWhen(t.updated) && parseWhen(t.updated).getTime() < cutoff)
+    .sort((a, b) => a.updated.localeCompare(b.updated));
+  document.getElementById('stale-list').innerHTML = stale.length
+    ? stale.slice(0, 6).map((t) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
+        <span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
+        <span class="pwhen">${whenHtml(t.updated, fmtDuration(Date.now() - parseWhen(t.updated).getTime()))}</span></li>`).join('')
+      + (stale.length > 6 ? `<li class="none">…and ${stale.length - 6} more</li>` : '')
+    : '<li class="none">Nothing stale — every open ticket was touched in the last 14 days.</li>';
+}
+
+function renderOpenTags() {
+  const rows = allTags()
+    .map(([tag]) => ({ tag, n: tickets.filter((t) => t.status !== 'done' && (t.tags || []).includes(tag)).length }))
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag))
+    .slice(0, 8);
+  const max = Math.max(...rows.map((r) => r.n), 1);
+  document.getElementById('open-tags').innerHTML = rows.length
+    ? rows.map((r) => `<button class="trow" data-tag="${esc(r.tag)}" data-open="1" title="${r.n} open — show on the board">
+        <span class="tname">#${esc(r.tag)}</span>
+        <span class="tbar"><span style="width:${(r.n / max) * 100}%;background:var(--series-1);border-radius:0 4px 4px 0"></span></span>
+        <span class="tcount">${r.n}</span></button>`).join('')
+    : '<div class="none">No open tickets with tags.</div>';
+}
+
+/** Calendar weeks (Monday start, local time), oldest first. Completed = done tickets by their last update. */
+function weeklyBuckets(n = 8) {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 7 * (n - 1));
+  const weeks = Array.from({ length: n }, (_, i) => {
+    const from = new Date(start); from.setDate(from.getDate() + 7 * i);
+    const to = new Date(from); to.setDate(to.getDate() + 7);
+    return { from, to, created: 0, completed: 0 };
+  });
+  const bucket = (value) => { const d = parseWhen(value); return d && weeks.find((w) => d >= w.from && d < w.to); };
+  for (const t of tickets) {
+    const c = bucket(t.created); if (c) c.created++;
+    if (t.status === 'done') { const d = bucket(t.updated); if (d) d.completed++; }
+  }
+  return weeks;
+}
+function renderWeekly() {
+  const weeks = weeklyBuckets();
+  const label = (w) => w.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const peak = Math.max(...weeks.flatMap((w) => [w.created, w.completed]), 1);
+  const step = peak <= 5 ? 1 : peak <= 10 ? 2 : peak <= 25 ? 5 : peak <= 50 ? 10 : 25;
+  const top = Math.ceil(peak / step) * step;
+  const W = 800, H = 240, padL = 30, padR = 8, padT = 12, padB = 28;
+  const plotH = H - padT - padB, slot = (W - padL - padR) / weeks.length, bw = Math.min(22, slot * 0.28), gap = 2;
+  const y = (v) => padT + plotH - (v / top) * plotH;
+  let svg = '';
+  for (let v = 0; v <= top; v += step) {
+    svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="${v === 0 ? 'var(--baseline)' : 'var(--gridline)'}" stroke-width="1"/>
+      <text class="bar-label" x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  }
+  weeks.forEach((w, i) => {
+    const cx = padL + slot * i + slot / 2;
+    const x1 = cx - gap / 2 - bw, x2 = cx + gap / 2;
+    const aria = `Week of ${label(w)}: ${w.created} created, ${w.completed} completed`;
+    svg += `<g class="grp"><rect class="hl" x="${padL + slot * i + 3}" y="${padT}" width="${slot - 6}" height="${plotH}" rx="6"/>`;
+    if (w.created) svg += `<path d="${roundedBar(x1, bw, y(w.created), y(0))}" fill="var(--series-1)"/>`;
+    if (w.completed) svg += `<path d="${roundedBar(x2, bw, y(w.completed), y(0))}" fill="var(--series-2)"/>`;
+    svg += `<rect class="hit" data-i="${i}" tabindex="0" role="img" aria-label="${aria}" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${plotH + padB}" fill="transparent"/></g>
+      <text class="bar-label" x="${cx}" y="${H - 8}" text-anchor="middle">${esc(label(w))}</text>`;
+  });
+  const chart = document.getElementById('weekly-chart');
+  chart.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  chart.innerHTML = svg;
+  const tipFor = (w) => `<div class="tt">Week of ${esc(label(w))}</div>
+    <div class="tr"><span class="key" style="background:var(--series-1)"></span>Created<b>${w.created}</b></div>
+    <div class="tr"><span class="key" style="background:var(--series-2)"></span>Completed<b>${w.completed}</b></div>`;
+  chart.querySelectorAll('.hit').forEach((hit) => {
+    const w = weeks[+hit.dataset.i];
+    hit.addEventListener('pointermove', (e) => showTip(tipFor(w), e.clientX, e.clientY));
+    hit.addEventListener('pointerleave', hideTip);
+    hit.addEventListener('focus', () => { const r = hit.getBoundingClientRect(); showTip(tipFor(w), r.left + r.width / 2, r.top + 40); });
+    hit.addEventListener('blur', hideTip);
+  });
+  document.getElementById('weekly-legend').innerHTML =
+    '<span><i style="background:var(--series-1)"></i>Created</span><span><i style="background:var(--series-2)"></i>Completed</span>';
+  document.getElementById('weekly-table').innerHTML =
+    '<thead><tr><th>Week of</th><th>Created</th><th>Completed</th></tr></thead><tbody>' +
+    weeks.map((w) => `<tr><td>${esc(label(w))}</td><td>${w.created}</td><td>${w.completed}</td></tr>`).join('') + '</tbody>';
+}
+
+function fmtDuration(ms) {
+  const mins = ms / 60000, hrs = mins / 60, days = hrs / 24;
+  if (mins < 60) return Math.max(1, Math.round(mins)) + ' min';
+  if (hrs < 48) return Math.round(hrs) + ' hours';
+  if (days < 60) return Math.round(days * 10) / 10 + ' days';
+  return Math.round(days / 30) + ' months';
+}
+/** Cycle time = created → last update of a done ticket (updated is the best "finished" signal the files carry). */
+/** One row per tag (largest first): done / in progress / remaining as a segmented bar. */
+function renderTagProgress() {
+  const rows = allTags().map(([tag]) => {
+    const group = tickets.filter((t) => (t.tags || []).includes(tag));
+    const done = group.filter((t) => t.status === 'done').length;
+    const active = group.filter((t) => t.status === 'in-progress').length;
+    return { tag, total: group.length, done, active };
+  }).sort((a, b) => b.total - a.total || a.tag.localeCompare(b.tag)).slice(0, 8);
+  document.getElementById('tag-progress').innerHTML = rows.length
+    ? rows.map((r) => `<button class="trow" data-tag="${esc(r.tag)}" title="${r.done} done, ${r.active} in progress, ${r.total - r.done - r.active} to go — show on the board">
+        <span class="tname">#${esc(r.tag)}</span>
+        <span class="tbar"><span style="width:${(r.done / r.total) * 100}%;background:var(--status-done)"></span><span style="width:${(r.active / r.total) * 100}%;background:var(--status-inprogress)"></span></span>
+        <span class="tcount">${r.done}/${r.total}</span></button>`).join('')
+    : '<div class="none">No tags yet.</div>';
+}
+function renderFlow() {
+  const WEEK = 7 * 86400000, now = Date.now();
+  const at = (v) => { const d = parseWhen(v); return d ? d.getTime() : null; };
+  const done = tickets.filter((t) => t.status === 'done' && at(t.created) && at(t.updated));
+  const avg = done.length ? done.reduce((sum, t) => sum + (at(t.updated) - at(t.created)), 0) / done.length : null;
+  const open = tickets.filter((t) => t.status !== 'done' && at(t.created));
+  const oldest = open.sort((a, b) => at(a.created) - at(b.created))[0];
+  const createdWeek = tickets.filter((t) => at(t.created) > now - WEEK).length;
+  const doneWeek = tickets.filter((t) => t.status === 'done' && at(t.updated) > now - WEEK).length;
+  document.getElementById('flow-stats').innerHTML = `
+    <div class="kv"><span class="k">Avg time to done</span>
+      <span class="v">${avg === null ? '—' : fmtDuration(avg)}${done.length ? `<small>across ${done.length} done</small>` : ''}</span></div>
+    <div class="kv"${oldest ? ` role="button" tabindex="0" onclick="openModal('${esc(oldest.id)}')"` : ''}><span class="k">Oldest open ticket</span>
+      <span class="v">${oldest ? `${esc(oldest.id)} · ${fmtDuration(now - at(oldest.created))}<small>${esc(oldest.title)}</small>` : '—'}</span></div>
+    <div class="kv"><span class="k">Created, last 7 days</span><span class="v">${createdWeek}</span></div>
+    <div class="kv"><span class="k">Done, last 7 days</span><span class="v">${doneWeek}</span></div>`;
+}
+
+function renderRecentComments() {
+  const recent = tickets
+    .flatMap((t) => t.comments.map((c) => ({ t, c, d: parseWhen(c.at) })))
+    .filter((x) => x.d)
+    .sort((a, b) => b.d - a.d)
+    .slice(0, 10);
+  document.getElementById('comment-list').innerHTML = recent.length
+    ? recent.map(({ t, c }) => `<li role="button" tabindex="0" onclick="openModal('${esc(t.id)}')">
+        <div class="chead"><span class="pid">${esc(t.id)}</span><span class="pt">${esc(t.title)}</span>
+        <span class="pwhen">${whenHtml(c.at)}</span></div>
+        <div class="cexcerpt">${esc(c.text.replace(/[*`]/g, '').replace(/\s+/g, ' '))}</div></li>`).join('')
+    : '<li class="none">No comments yet.</li>';
 }
 
 function renderPrioChart(open) {
@@ -373,7 +1439,7 @@ function renderPrioChart(open) {
     const y = H - padB - h;
     const r = Math.min(4, h / 2);
     if (h > 0) {
-      s += `<path class="bar" data-i="${i}" d="M${cx - barW / 2},${H - padB} L${cx - barW / 2},${y + r} Q${cx - barW / 2},${y} ${cx - barW / 2 + r},${y} L${cx + barW / 2 - r},${y} Q${cx + barW / 2},${y} ${cx + barW / 2},${y + r} L${cx + barW / 2},${H - padB} Z" fill="${PRIO_BAR[p]}"/>`;
+      s += `<path class="bar" data-i="${i}" d="M${cx - barW / 2},${H - padB} L${cx - barW / 2},${y + r} Q${cx - barW / 2},${y} ${cx - barW / 2 + r},${y} L${cx + barW / 2 - r},${y} Q${cx + barW / 2},${y} ${cx + barW / 2},${y + r} L${cx + barW / 2},${H - padB} Z" fill="${PRIO_COLOR[p]}"/>`;
       s += `<text class="bar-value" x="${cx}" y="${y - 6}" text-anchor="middle">${counts[i]}</text>`;
     } else {
       s += `<text class="bar-value" x="${cx}" y="${H - padB - 6}" text-anchor="middle" opacity="0.5">0</text>`;
@@ -398,13 +1464,102 @@ function renderPrioChart(open) {
 
 /* ---------- Modal ---------- */
 function openModal(id) {
-  const t = tickets.find((x) => x.id === id);
-  if (!t) return;
+  if (!tickets.some((x) => x.id === id)) return;
+  if (route.ticket) return nav({ ticket: id }, { replace: true });
+  modalPushed = true;
+  nav({ ticket: id });
+}
+function closeModal() {
+  if (!route.ticket) return;
+  if (modalPushed) { modalPushed = false; history.back(); } else nav({ ticket: null }, { replace: true });
+}
+/**
+ * Other tickets sharing tags, rarest tags counting most. Tags on more than ~40% of tickets (like 'board' in a
+ * board-focused project) say nothing about relatedness, so they are ignored.
+ */
+function relatedTickets(t, limit = 5) {
+  const freq = Object.fromEntries(allTags().map(([tag, n]) => [tag, n]));
+  const useful = (tag) => freq[tag] <= Math.max(5, tickets.length * 0.4);
+  return tickets
+    .filter((x) => x.id !== t.id)
+    .map((x) => {
+      const shared = (x.tags || []).filter((tag) => (t.tags || []).includes(tag) && useful(tag));
+      return { x, shared, score: shared.reduce((sum, tag) => sum + 1 / freq[tag], 0) };
+    })
+    .filter((r) => r.shared.length)
+    .sort((a, b) => b.score - a.score || ticketNo(a.x) - ticketNo(b.x))
+    .slice(0, limit);
+}
+function relatedHtml(t) {
+  const rel = relatedTickets(t);
+  if (!rel.length) return '';
+  return `<div class="msec"><h3>Related tickets</h3><ul class="plist">${rel.map(({ x, shared }) => `
+    <li role="button" tabindex="0" onclick="openModal('${esc(x.id)}')">
+      <span class="sdot" style="background:${STATUS_COLOR[x.status] || 'var(--status-todo)'}" title="${esc(statusLabel(x.status))}"></span>
+      <span class="pid">${esc(x.id)}</span><span class="pt">${esc(x.title)}</span>
+      <span class="pwhen">${shared.map((tag) => '#' + esc(tag)).join(' ')}</span></li>`).join('')}</ul></div>`;
+}
+
+/** Where a ticket usually goes next, for the pre-selected 'hira move' target. */
+function suggestedStatus(t) {
+  const flow = { 'todo': 'in-progress', 'in-progress': 'done', 'blocked': 'in-progress', 'done': 'todo' };
+  if (flow[t.status] && config.statuses.includes(flow[t.status])) return flow[t.status];
+  const others = config.statuses.filter((x) => x !== t.status);
+  return others[0] || t.status;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through to the legacy path */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { /* clipboard unavailable */ }
+  ta.remove();
+  return ok;
+}
+document.getElementById('modal').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+  const label = btn.textContent;
+  btn.textContent = (await copyText(btn.closest('.cmd').querySelector('code').textContent)) ? 'Copied ✓' : 'Select & ⌘C';
+  setTimeout(() => { btn.textContent = label; }, 1400);
+});
+document.getElementById('modal').addEventListener('change', (e) => {
+  if (e.target.classList.contains('mv-select')) e.target.closest('.cmd').querySelector('.mv-status').textContent = e.target.value;
+});
+
+/** Tickets in the order the board shows them (columns left→right, each column's sort and the active filters applied). */
+function boardOrder(list) {
+  return displayStatuses().flatMap((status) => list.filter((t) => t.status === status).sort(SORTS[sortFor(status)].cmp));
+}
+function stepList(id) {
+  const visible = route.view === 'list' ? sortedListRows() : boardOrder(visibleTickets());
+  return visible.some((t) => t.id === id) ? visible : boardOrder(tickets);
+}
+function navHtml(t) {
+  const list = stepList(t.id), i = list.findIndex((x) => x.id === t.id);
+  return `<span class="pos">${i + 1} / ${list.length}</span>
+    <button class="step" data-step="-1" aria-label="Previous ticket (k)" title="Previous (k)"${i <= 0 ? ' disabled' : ''}>‹</button>
+    <button class="step" data-step="1" aria-label="Next ticket (j)" title="Next (j)"${i >= list.length - 1 ? ' disabled' : ''}>›</button>`;
+}
+function stepTicket(delta) {
+  if (!route.ticket) return;
+  const list = stepList(route.ticket), i = list.findIndex((x) => x.id === route.ticket) + delta;
+  if (i >= 0 && i < list.length) { nav({ ticket: list[i].id }, { replace: true }); document.getElementById('modal').scrollTop = 0; }
+}
+document.getElementById('modal').addEventListener('click', (e) => {
+  const step = e.target.closest('.step');
+  if (step) return stepTicket(+step.dataset.step);
+  const ref = e.target.closest('a.xref');
+  if (ref) { e.preventDefault(); openModal(ref.dataset.ticket); }
+});
+
+function renderModal(t) {
   const modal = document.getElementById('modal');
   modal.innerHTML = `
-    <button class="close" onclick="closeModal()" aria-label="Close">×</button>
-    <div class="mid">${esc(t.id)} · created ${fmtDate(t.created)} · updated ${relTime(t.updated)}</div>
-    <h1>${esc(t.title)}</h1>
+    <div class="mtools">${navHtml(t)}<button class="close" onclick="closeModal()" aria-label="Close">×</button></div>
+    <div class="mid">${esc(t.id)} · created ${whenHtml(t.created, fmtDate(t.created))} · updated ${whenHtml(t.updated)}</div>
+    <h1 id="modal-title">${esc(t.title)}</h1>
     <div class="mmeta">
       <span class="chip"><span class="dot" style="background:${STATUS_COLOR[t.status] || 'var(--status-todo)'}"></span>${esc(statusLabel(t.status))}</span>
       ${chipHtml(t)}
@@ -413,26 +1568,214 @@ function openModal(id) {
       <div class="mdesc">${t.description ? md(t.description) : '<span style="color:var(--text-muted)">No description.</span>'}</div></div>
     <div class="msec"><h3>Comments (${t.comments.length})</h3>
       ${t.comments.length
-        ? t.comments.map((c) => `<div class="comment"><div class="cat">${esc(c.at)}</div><div class="ctext">${esc(c.text)}</div></div>`).join('')
-        : '<span style="color:var(--text-muted)">No comments.</span>'}</div>`;
-  document.getElementById('overlay').classList.add('open');
+        ? t.comments.map((c) => `<div class="comment"><div class="cat">${commentTimeHtml(c.at)}</div><div class="ctext mdesc">${md(c.text)}</div></div>`).join('')
+        : '<span style="color:var(--text-muted)">No comments.</span>'}</div>
+    ${relatedHtml(t)}
+    <div class="msec"><h3>Command line</h3>
+      <div class="cmd"><code>hira move ${esc(t.id)} <span class="mv-status">${esc(suggestedStatus(t))}</span></code>
+        <select class="mv-select" aria-label="Target status">${config.statuses.filter((x) => x !== t.status)
+          .map((x) => `<option value="${esc(x)}"${x === suggestedStatus(t) ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select>
+        <button class="btn copy-btn">Copy</button></div>
+      <div class="cmd"><code>hira comment ${esc(t.id)} ""</code><button class="btn copy-btn">Copy</button></div>
+      <div class="cmd"><code>hira show ${esc(t.id)}</code><button class="btn copy-btn">Copy</button></div>
+      <div class="cmd"><code>.hira/tickets/${esc(t.id)}.md</code><button class="btn copy-btn">Copy path</button></div></div>`;
+  const overlay = document.getElementById('overlay');
+  if (!overlay.classList.contains('open')) {
+    lastFocus = document.activeElement;
+    overlay.classList.add('open');
+    setBackgroundInert(true);
+  }
+  modal.querySelector('.close').focus();
 }
-function closeModal() { document.getElementById('overlay').classList.remove('open'); }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
+  if (document.getElementById('help-overlay').classList.contains('open')) {
+    if (e.key === 'Escape' || e.key === '?') { e.preventDefault(); closeHelp(); }
+    return;
+  }
+  if (e.key === '?' && !e.target.matches('input, textarea, select')) { e.preventDefault(); openHelp(); return; }
+  if (document.getElementById('palette-overlay').classList.contains('open')) {
+    if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (paletteHits.length) { paletteIndex = (paletteIndex + (e.key === 'ArrowDown' ? 1 : -1) + paletteHits.length) % paletteHits.length; renderPalette(); }
+    } else if (e.key === 'Enter') { e.preventDefault(); pickPalette(paletteIndex); }
+    return;
+  }
+  if (e.key === 'Escape' && e.target.id === 'search' && !menuEl) {
+    if (e.target.value) { e.target.value = ''; nav({ q: '' }, { replace: true }); } else e.target.blur();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (menuEl) { const a = menuAnchor; closeMenu(); if (a && a.isConnected) a.focus(); } else closeModal();
+    return;
+  }
+  const t = e.target;
+  if (route.ticket && !t.matches('input, textarea, select') && !e.metaKey && !e.ctrlKey) {
+    if (e.key === 'j' || e.key === 'ArrowRight') { e.preventDefault(); return stepTicket(1); }
+    if (e.key === 'k' || e.key === 'ArrowLeft') { e.preventDefault(); return stepTicket(-1); }
+  }
+  if (e.key === '/' && !t.matches('input, textarea, select') && !document.getElementById('overlay').classList.contains('open')) {
+    const search = document.getElementById('search');
+    if (search && route.view !== 'dash') { e.preventDefault(); search.focus(); search.select(); }
+    return;
+  }
+  // div[role=button] elements (cards, dashboard rows) behave like real buttons
+  if ((e.key === 'Enter' || e.key === ' ') && t.matches('[role="button"], tr[data-id]') && t.tagName !== 'BUTTON') {
+    e.preventDefault();
+    t.click();
+  }
+  // arrow keys move between tabs and menu items
+  if (t.matches('[role="tab"]') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const i = VIEWS.indexOf(route.view) + (e.key === 'ArrowRight' ? 1 : -1);
+    const next = VIEWS[(i + VIEWS.length) % VIEWS.length];
+    showView(next);
+    document.getElementById('tab-' + next).focus();
+  }
+  if (menuEl && menuEl.contains(t) && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault();
+    const items = [...menuEl.querySelectorAll('.menu-item')];
+    const i = items.indexOf(t) + (e.key === 'ArrowDown' ? 1 : -1);
+    items[(i + items.length) % items.length].focus();
+  }
+});
 
-function showView(which) {
-  document.getElementById('view-board').classList.toggle('active', which === 'board');
-  document.getElementById('view-dash').classList.toggle('active', which === 'dash');
-  document.getElementById('tab-board').classList.toggle('active', which === 'board');
-  document.getElementById('tab-dash').classList.toggle('active', which === 'dash');
+/* ---------- Theme ---------- */
+const THEME_ICON = {
+  // shown icon = the theme a click switches to
+  light: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  dark: '<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+};
+function renderThemeToggle() {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  const btn = document.getElementById('theme-toggle');
+  btn.innerHTML = THEME_ICON[next];
+  btn.title = btn.ariaLabel = `Switch to ${next} theme`;
 }
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('hira-theme', next); } catch { /* storage unavailable; theme just won't persist */ }
+  renderThemeToggle();
+}
+
+/* ---------- Routing: view and open ticket live in location.hash ---------- */
+const VIEWS = ['board', 'list', 'dash'];
+/** Status filter values: any configured status, plus the pseudo-statuses 'open' (not done) and 'overdue'. */
+const STATUS_FILTERS = () => [...config.statuses, 'open', 'overdue'];
+let route = { view: 'board', ticket: null, q: '', p: '', tag: '', s: '' };
+let renderedFilters = null;
+let modalPushed = false;
+
+function parseHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const view = p.get('view');
+  const prio = p.get('p');
+  return {
+    view: VIEWS.includes(view) ? view : 'board',
+    ticket: p.get('ticket'),
+    q: p.get('q') || '',
+    p: config.priorities.includes(prio) ? prio : '',
+    tag: p.get('tag') || '',
+    s: STATUS_FILTERS().includes(p.get('s')) ? p.get('s') : '',
+  };
+}
+function hashFor(r) {
+  const p = new URLSearchParams();
+  if (r.view !== 'board') p.set('view', r.view);
+  if (r.ticket) p.set('ticket', r.ticket);
+  for (const key of ['q', 'p', 'tag', 's']) if (r[key]) p.set(key, r[key]);
+  return '#' + p.toString();
+}
+function nav(patch, { replace = false } = {}) {
+  const url = hashFor({ ...route, ...patch });
+  if (url === hashFor(route)) return;
+  if (replace) { history.replaceState(null, '', url); applyRoute(); } else location.hash = url;
+}
+function applyRoute() {
+  route = parseHash();
+  // Board and List share one section (and toolbar); only the body differs
+  document.getElementById('view-board').classList.toggle('active', route.view !== 'dash');
+  document.getElementById('view-dash').classList.toggle('active', route.view === 'dash');
+  for (const v of VIEWS) {
+    const tab = document.getElementById('tab-' + v);
+    tab.classList.toggle('active', route.view === v);
+    tab.setAttribute('aria-selected', String(route.view === v));
+    tab.tabIndex = route.view === v ? 0 : -1;
+  }
+  document.querySelector('main').classList.toggle('board-mode', route.view === 'board');
+  // re-render the board only when the filters changed, so opening a ticket doesn't reset column scroll positions
+  const filterKey = [route.view === 'list', route.q, route.p, route.tag, route.s].join('\u0000');
+  if (filterKey !== renderedFilters) { renderedFilters = filterKey; renderToolbar(); renderBoard(); }
+  const t = route.ticket && tickets.find((x) => x.id === route.ticket);
+  if (t) renderModal(t);
+  else {
+    document.getElementById('overlay').classList.remove('open');
+    setBackgroundInert(false);
+    modalPushed = false;
+    if (lastFocus && lastFocus.isConnected) lastFocus.focus();
+    lastFocus = null;
+  }
+}
+/* While the dialog is open the page behind it is inert: no tabbing into it, hidden from screen readers. */
+function setBackgroundInert(on) {
+  document.querySelector('header').inert = on;
+  document.querySelector('main').inert = on;
+}
+let lastFocus = null;
+const showView = (view) => nav({ view }, { replace: true });
+window.addEventListener('hashchange', applyRoute);
 
 document.getElementById('proj-name').textContent = config.name;
-document.title = `hira · ${config.name}`;
-document.getElementById('snapshot-note').innerHTML =
-  `Snapshot from ${new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} — rerun <code>hira board</code> to refresh`;
-renderBoard();
+function renderTabIdentity() {
+  const open = tickets.filter((t) => t.status !== 'done').length;
+  const blocked = tickets.filter((t) => t.status === 'blocked').length;
+  document.title = `hira · ${config.name}` + (tickets.length ? ` — ${open} open${blocked ? ` · ${blocked} blocked` : ''}` : '');
+  // inline SVG favicon; a red dot marks a board with blocked tickets
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#3987e5"/>
+    <path d="M10 8v16M10 17c0-3 2-5 5-5s5 2 5 5v7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    ${blocked ? '<circle cx="26" cy="6" r="5.5" fill="#d03b3b" stroke="#fff" stroke-width="1.5"/>' : ''}</svg>`;
+  let link = document.querySelector('link[rel="icon"]');
+  if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+  link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+renderTabIdentity();
+/** Header note + a warning when the snapshot is over a day old (agents/CLI refresh it on every change, so this means nothing ran since). */
+function renderSnapshotNote(generated) {
+  const d = new Date(generated), age = Date.now() - d.getTime();
+  const note = document.getElementById('snapshot-note');
+  note.textContent = `Updated ${d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} · reload to refresh`;
+  note.title = 'This board is rebuilt on every hira command; reload the page to pick up changes.';
+  const warn = document.getElementById('stale-warn');
+  warn.hidden = age < 86400000;
+  if (!warn.hidden) warn.innerHTML = `This board is a snapshot from <b>${fmtDuration(age)} ago</b>. Run <code>hira board</code> (any <code>hira</code> command refreshes it), then reload.`;
+}
+renderSnapshotNote(generatedAt);
+function renderProgress() {
+  const done = tickets.filter((t) => t.status === 'done').length, total = tickets.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const el = document.getElementById('progress');
+  el.hidden = !total;
+  el.title = el.ariaLabel = `${done} of ${total} tickets done (${pct}%)`;
+  el.innerHTML = `<span class="bar"><span style="width:${pct}%"></span></span><span>${done} / ${total} done</span>`;
+}
+document.getElementById('tiles').addEventListener('click', (e) => {
+  const tile = e.target.closest('.tile');
+  if (tile) nav({ view: 'board', q: '', p: '', tag: '', s: tile.dataset.filter });
+});
+document.getElementById('tag-progress').addEventListener('click', (e) => {
+  const row = e.target.closest('.trow');
+  if (row) nav({ view: 'board', q: '', p: '', s: '', tag: row.dataset.tag });
+});
+document.getElementById('open-tags').addEventListener('click', (e) => {
+  const row = e.target.closest('.trow');
+  if (row) nav({ view: 'board', q: '', p: '', s: 'open', tag: row.dataset.tag });
+});
+renderThemeToggle();
+renderSince();
+renderProgress();
 renderDash();
+applyRoute();
 </script>
 </body>
 </html>

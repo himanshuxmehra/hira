@@ -78,7 +78,13 @@ Looked at SortableJS — tiny, no deps.
 
 ## The board
 
-`hira board` bakes current ticket data into a self-contained `.hira/board.html` — a kanban board plus a dashboard (open/blocked/overdue tiles, priority chart, due-soon and recently-updated lists). It works in any browser with no server; it's a **snapshot**, so rerun `hira board` after changes. Light and dark mode follow your system.
+`hira board` bakes current ticket data into a self-contained `.hira/board.html` that works in any browser with no server. It is a **snapshot**, but every `hira add/move/edit/comment/delete` rebuilds it automatically, so just reload the page (the file is gitignored; run `hira board` after cloning).
+
+- **Board** — per-column scrolling, search (`/`), status/priority/tag filters, board-wide and per-column sort, hide columns, compact cards, swimlanes by priority or tag, "Copy as table" (markdown) for standups
+- **List** — sortable table sharing the same filters
+- **Dashboard** — clickable status tiles, priority chart, flow stats, progress and open tickets by tag, stale tickets, weekly created-vs-completed, recent comments
+- **Ticket view** — markdown (lists, checkboxes, quotes, links), `HIRA-3` cross-links, commit-hash links to GitHub/GitLab, related tickets, copy-ready `hira` commands, `j`/`k` to step through tickets
+- **Around the edges** — dark (default) / light toggle, `Cmd/Ctrl+K` quick jump, `?` for shortcuts, "since your last visit" markers, state in the URL hash (shareable filtered views), print styles
 
 ## AI agents
 

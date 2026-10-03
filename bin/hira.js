@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { Store, findRoot, initStore } from '../src/core/store.js';
+import { localDate, formatCommentTime } from '../src/core/ticket.js';
 import { generateBoard } from '../src/core/board.js';
 
 const pkgDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,11 +37,16 @@ function printTicketLine(t, { statuses, priorities }) {
   const paintP = PRIO_PAINT[t.priority] || ((x) => x);
   let line = `${bold(t.id.padEnd(10))} ${paintS(t.status.padEnd(statusW))}  ${paintP(t.priority.padEnd(prioW))}  ${t.title}`;
   if (t.due) {
-    const overdue = t.due < new Date().toISOString().slice(0, 10) && t.status !== 'done';
+    const overdue = t.due < localDate() && t.status !== 'done';
     line += '  ' + (overdue ? red(`due ${t.due} (overdue)`) : dim(`due ${t.due}`));
   }
   if (t.tags.length) line += '  ' + magenta(t.tags.map((x) => '#' + x).join(' '));
   console.log(line);
+}
+
+/** Keep .hira/board.html in step with the tickets; best-effort so a board failure never fails a command. */
+function refreshBoard(store) {
+  try { generateBoard(store); } catch { /* snapshot refresh is optional */ }
 }
 
 function parseTags(value) {
@@ -106,6 +112,7 @@ program
     } catch (err) {
       fail(err.message);
     }
+    refreshBoard(store);
     if (opts.json) return console.log(JSON.stringify(ticket, null, 2));
     console.log(green('✓') + ` created ${bold(ticket.id)}: ${ticket.title}`);
   });
@@ -151,7 +158,7 @@ program
     if (t.description) console.log('\n' + t.description);
     if (t.comments.length) {
       console.log('\n' + bold('Comments'));
-      for (const c of t.comments) console.log(dim(`  ${c.at}`) + `  ${c.text.replace(/\n/g, '\n  ')}`);
+      for (const c of t.comments) console.log(dim(`  ${formatCommentTime(c.at)}`) + `  ${c.text.replace(/\n/g, '\n  ')}`);
     }
   });
 
@@ -162,6 +169,7 @@ program
     const store = requireStore();
     let t;
     try { t = store.move(id, status); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     const paint = STATUS_PAINT[status] || ((x) => x);
     console.log(green('✓') + ` ${bold(t.id)} → ${paint(status)}`);
   });
@@ -187,6 +195,7 @@ program
     if (Object.keys(patch).length === 0) fail('nothing to change — pass at least one field flag (see `hira edit --help`)');
     let t;
     try { t = store.update(id, patch); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     console.log(green('✓') + ` updated ${bold(t.id)} (${Object.keys(patch).join(', ')})`);
   });
 
@@ -197,6 +206,7 @@ program
     const store = requireStore();
     let t;
     try { t = store.addComment(id, text); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     console.log(green('✓') + ` commented on ${bold(t.id)}`);
   });
 
@@ -207,6 +217,7 @@ program
     const store = requireStore();
     let deleted;
     try { deleted = store.delete(id); } catch (err) { fail(err.message); }
+    refreshBoard(store);
     console.log(green('✓') + ` deleted ${bold(deleted)}`);
   });
 

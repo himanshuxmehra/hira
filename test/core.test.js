@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseTicket, serializeTicket } from '../src/core/ticket.js';
+import { parseTicket, serializeTicket, localDate, commentTimestamp, formatCommentTime } from '../src/core/ticket.js';
 import { initStore, findRoot, Store } from '../src/core/store.js';
+import { commitUrlFromRemote } from '../src/core/board.js';
 
 test('ticket roundtrip: serialize then parse preserves everything', () => {
   const ticket = {
@@ -79,4 +80,29 @@ test('store CRUD lifecycle', () => {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('localDate uses the local calendar day, not UTC', () => {
+  assert.equal(localDate(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
+  assert.equal(localDate(new Date(2026, 11, 31, 0, 1)), '2026-12-31');
+});
+
+test('comment timestamps are ISO; legacy local stamps still display', () => {
+  const at = commentTimestamp(new Date('2026-10-03T02:51:07.000Z'));
+  assert.equal(at, '2026-10-03T02:51:07.000Z');
+  assert.match(formatCommentTime(at), /^\d{4}-\d\d-\d\d \d\d:\d\d$/);
+  assert.equal(formatCommentTime('2026-07-11 02:57'), '2026-07-11 02:57');
+  // and they survive a serialize/parse roundtrip
+  const t = parseTicket(serializeTicket({ id: 'X-1', title: 't', status: 'todo', priority: 'low', tags: [], comments: [{ at, text: 'hi' }] }));
+  assert.equal(t.comments[0].at, at);
+});
+
+test('commitUrlFromRemote handles common remote formats', () => {
+  const gh = 'https://github.com/o/r/commit/';
+  assert.equal(commitUrlFromRemote('https://github.com/o/r.git'), gh);
+  assert.equal(commitUrlFromRemote('git@github.com:o/r.git'), gh);
+  assert.equal(commitUrlFromRemote('ssh://git@github.com/o/r'), gh);
+  assert.equal(commitUrlFromRemote('https://gitlab.com/g/sub/r.git'), 'https://gitlab.com/g/sub/r/-/commit/');
+  assert.equal(commitUrlFromRemote('https://example.com/o/r.git'), null);
+  assert.equal(commitUrlFromRemote(''), null);
 });
