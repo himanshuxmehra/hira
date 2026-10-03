@@ -8,6 +8,7 @@ No server, no account, no database. Everything is files, so it versions with you
 
 ```sh
 npm install -g hira-board   # or: npm link from this repo
+npx hira-board list         # or run without installing
 ```
 
 The package is `hira-board`; the command it installs is `hira`.
@@ -73,12 +74,16 @@ Looked at SortableJS — tiny, no deps.
 
 ## Comments
 
-- **2026-07-10 14:02** — blocked on API route
+- **2026-07-10T14:02:11.000Z** — blocked on API route
 ```
+
+Comment timestamps are stored as UTC ISO-8601 instants and shown in your local time by `hira show` and the board. Older `YYYY-MM-DD HH:mm` comments are still read as-is.
 
 ## The board
 
-`hira board` bakes current ticket data into a self-contained `.hira/board.html` that works in any browser with no server. It is a **snapshot**, but every `hira add/move/edit/comment/delete` rebuilds it automatically, so just reload the page (the file is gitignored; run `hira board` after cloning).
+`hira board` bakes current ticket data into a self-contained `.hira/board.html` that works in any browser with no server. It is a **snapshot**, but every `hira add/move/edit/comment/delete` rebuilds it automatically, so just reload the page (the file is gitignored; run `hira board` after cloning). A snapshot more than a day old shows a warning banner.
+
+Commit hashes in tickets and comments link to GitHub or GitLab when the repo's `origin` remote points to either one.
 
 - **Board** — per-column scrolling, search (`/`), status/priority/tag filters, board-wide and per-column sort, hide columns, compact cards, swimlanes by priority or tag, "Copy as table" (markdown) for standups
 - **List** — sortable table sharing the same filters
@@ -95,7 +100,7 @@ Looked at SortableJS — tiny, no deps.
 The core is importable if you want to build on it:
 
 ```js
-import { Store, findRoot, initStore } from 'hira-board';
+import { Store, findRoot, initStore, formatCommentTime, localDate } from 'hira-board';
 
 const store = new Store(findRoot());
 store.create({ title: 'From code', priority: 'high' });

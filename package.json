@@ -1,6 +1,6 @@
 {
   "name": "hira-board",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Git-native task tracker and kanban board built for AI coding agents. Markdown tickets, a static board, zero infrastructure.",
   "type": "module",
   "bin": {
