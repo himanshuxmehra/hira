@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/hira-board)](https://www.npmjs.com/package/hira-board)
 
-[![Watch the 15-second demo](https://raw.githubusercontent.com/himanshuxmehra/hira/main/promo/hira-promo-poster.png)](https://github.com/himanshuxmehra/hira/blob/main/promo/hira-promo.mp4)
+https://github.com/user-attachments/assets/915f009c-c3d6-44fe-915a-6600e925051c
 
 Git-native task tracking for you and your AI agents. Tickets are plain markdown files in `.hira/tickets/`, managed by a CLI your agents can drive, viewed on a static kanban board + dashboard.
 
